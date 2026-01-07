@@ -37,6 +37,7 @@ RACE_TYPE = {
     'H': 'Hurdle',
     'B': 'NH Flat',
     'W': 'NH Flat',
+    'U': 'Unknown',
 }
 
 type Racecards = defaultdict[str, defaultdict[str, defaultdict[str, dict[str, Any]]]]
@@ -429,7 +430,7 @@ def scrape_racecards(
         if fetch_profiles:
             profile_hrefs = doc.xpath("//a[@data-test-selector='RC-cardPage-runnerName']/@href")
             profile_urls = [url_base + a.split('#')[0] + '/form' for a in profile_hrefs]
-            profiles = get_profiles(profile_urls)
+            profiles = get_profiles(client, profile_urls)
 
         race: Racecard = Racecard()
 
