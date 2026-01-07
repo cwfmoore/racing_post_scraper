@@ -6,7 +6,7 @@ from curl_cffi.requests import get
 
 class Update:
     def __init__(self):
-        self.root_dir: Path = Path.cwd().parent
+        self.root_dir: Path = Path(__file__).parent.parent.parent
         self.api_url: str = 'https://api.github.com/repos/joenano/rpscrape/commits/master'
 
     def local_hash(self) -> str:

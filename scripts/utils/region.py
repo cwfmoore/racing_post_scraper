@@ -1,10 +1,12 @@
+from pathlib import Path
 from orjson import loads
 
-_regions = loads(open('../courses/_regions', 'r').read())
+_base_path = Path(__file__).parent.parent.parent / 'courses'
+_regions = loads((_base_path / '_regions').read_bytes())
 
 
 def get_region(course_id: str) -> str:
-    courses = loads(open('../courses/_courses', 'r').read())
+    courses = loads((_base_path / '_courses').read_bytes())
     courses.pop('all')
 
     for region, course in courses.items():

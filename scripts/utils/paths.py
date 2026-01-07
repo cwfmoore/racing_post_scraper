@@ -29,7 +29,7 @@ def build_paths(
     request: RequestKey,
     gzip_output: bool = False,
 ) -> Paths:
-    project_root = Path('..')
+    project_root = Path(__file__).parent.parent.parent
     data_root = project_root / 'data'
     cache_root = project_root / '.cache'
 

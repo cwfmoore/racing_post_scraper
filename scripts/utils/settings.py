@@ -1,8 +1,10 @@
-import os
 import tomli
 
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
+
+_settings_path = Path(__file__).parent.parent.parent / 'settings'
 
 
 class Settings:
@@ -33,11 +35,11 @@ class Settings:
         return fields
 
     def load_toml(self) -> Mapping[str, Any] | None:
-        default_path = '../settings/default_settings.toml'
-        user_path = '../settings/user_settings.toml'
+        default_path = _settings_path / 'default_settings.toml'
+        user_path = _settings_path / 'user_settings.toml'
 
-        path = user_path if os.path.isfile(user_path) else default_path
-        if path == default_path and not os.path.isfile(default_path):
+        path = user_path if user_path.is_file() else default_path
+        if path == default_path and not default_path.is_file():
             raise FileNotFoundError(f'{default_path} does not exist')
 
         try:

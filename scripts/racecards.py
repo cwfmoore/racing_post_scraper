@@ -2,10 +2,10 @@
 
 import argparse
 import datetime
-import os
 import re
 import sys
 import tomli
+import os
 
 from collections import defaultdict
 from dotenv import load_dotenv
@@ -44,8 +44,9 @@ type Racecards = defaultdict[str, defaultdict[str, defaultdict[str, dict[str, An
 
 def load_field_config() -> dict[str, Any]:
     """Load field configuration from settings/user_racecard_settings.toml or default_racecard_settings.toml"""
-    user_config_path = Path('../settings/user_racecard_settings.toml')
-    default_config_path = Path('../settings/default_racecard_settings.toml')
+    _settings_path = Path(__file__).parent.parent / 'settings'
+    user_config_path = _settings_path / 'user_racecard_settings.toml'
+    default_config_path = _settings_path / 'default_racecard_settings.toml'
 
     # Try user config first, fallback to default
     config_path = user_config_path if user_config_path.exists() else default_config_path
@@ -522,8 +523,8 @@ def main() -> None:
         print(f'\nError: Must specify a day (--day) or days (--days) (1-{MAX_DAYS})')
         sys.exit(1)
 
-    if not os.path.exists('../racecards'):
-        os.makedirs('../racecards')
+    _racecards_path = Path(__file__).parent.parent / 'racecards'
+    _racecards_path.mkdir(exist_ok=True)
 
     region = args.region.lower() if args.region else None
 
@@ -544,7 +545,7 @@ def main() -> None:
     for date in race_urls:
         racecards = scrape_racecards(race_urls, date, config, client)
 
-        with open(f'../racecards/{date}.json', 'w', encoding='utf-8') as f:
+        with open(_racecards_path / f'{date}.json', 'w', encoding='utf-8') as f:
             _ = f.write(dumps(racecards).decode('utf-8'))
 
 

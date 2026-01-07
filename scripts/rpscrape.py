@@ -35,10 +35,17 @@ RACE_TYPES: dict[str, set[str]] = {
 def check_for_update() -> bool:
     update = Update()
 
-    if not update.available():
+    try:
+        if not update.available():
+            return False
+    except Exception:
         return False
 
-    choice = input('Update available. Do you want to update? [y/N] ').strip().lower()
+    try:
+        choice = input('Update available. Do you want to update? [y/N] ').strip().lower()
+    except EOFError:
+        return False
+
     if choice != 'y':
         return False
 
