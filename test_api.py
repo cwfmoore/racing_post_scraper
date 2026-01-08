@@ -3,7 +3,10 @@
 Test script for Racing Post API endpoints.
 
 Usage:
-    python test_api.py
+    python test_api.py                    # Test all endpoints
+    python test_api.py --am               # Test AM job (racecards)
+    python test_api.py --pm               # Test PM job (results)
+    python test_api.py --skip-scrape      # Skip scraping, just test GETs
     python test_api.py --api-url http://localhost:8000/api/racing-post
 """
 import argparse
@@ -53,15 +56,148 @@ def test_endpoint(name, method, url, json_data=None, expect_key=None):
         return False, None
 
 
+def test_am_job(api_url):
+    """Test AM job: Scrape racecards + sync to DB."""
+    print("=" * 60)
+    print("AM JOB TEST: Scrape Racecards + Sync")
+    print("=" * 60)
+    print(f"API URL: {api_url}")
+    print(f"Date: {date.today()}")
+    print("=" * 60)
+
+    # Step 1: Scrape racecards
+    print("\n[STEP 1] Scrape racecards from Racing Post")
+    print("-" * 40)
+    ok, scrape_data = test_endpoint(
+        "Scrape racecards",
+        "POST",
+        f"{api_url}/scrape-racecards/",
+        json_data={"day": 1, "region": "gb", "fetch_stats": True, "fetch_profiles": True},
+        expect_key="races"
+    )
+
+    if not ok:
+        log("AM JOB FAILED at scrape step", "FAIL")
+        return False
+
+    races = scrape_data.get("races", 0)
+    if races == 0:
+        log("No races found today - this may be expected", "WARN")
+        return True
+
+    # Step 2: Sync to database
+    print("\n[STEP 2] Sync to database")
+    print("-" * 40)
+    ok, sync_data = test_endpoint(
+        "Sync racecards",
+        "POST",
+        f"{api_url}/sync-racecards/",
+        json_data={
+            "data": scrape_data.get("data", {}),
+            "scrape_date": str(date.today())
+        },
+        expect_key="entries_created"
+    )
+
+    if not ok:
+        log("AM JOB FAILED at sync step", "FAIL")
+        return False
+
+    # Summary
+    print("\n[RESULT]")
+    print("-" * 40)
+    log(f"Races scraped: {races}")
+    log(f"Entries created: {sync_data.get('entries_created', 0)}")
+    log(f"Entries updated: {sync_data.get('entries_updated', 0)}")
+    log(f"Horse stats: {sync_data.get('stats_created', 0)}")
+    log(f"Jockey stats: {sync_data.get('jockey_stats_created', 0)}")
+    log(f"Trainer stats: {sync_data.get('trainer_stats_created', 0)}")
+    log(f"Trainer history: {sync_data.get('trainer_history_created', 0)}")
+    log(f"Owner history: {sync_data.get('owner_history_created', 0)}")
+    log(f"Medical records: {sync_data.get('medical_created', 0)}")
+
+    errors = sync_data.get("errors", [])
+    if errors:
+        log(f"Errors: {len(errors)}", "WARN")
+        for e in errors[:3]:
+            log(f"  - {e}", "WARN")
+
+    print("\n" + "=" * 60)
+    log("AM JOB COMPLETE", "OK")
+    print("=" * 60)
+    return True
+
+
+def test_pm_job(api_url, target_date=None):
+    """Test PM job: Scrape results."""
+    if target_date is None:
+        target_date = (date.today() - timedelta(days=1)).strftime("%Y/%m/%d")
+
+    print("=" * 60)
+    print("PM JOB TEST: Scrape Results")
+    print("=" * 60)
+    print(f"API URL: {api_url}")
+    print(f"Target date: {target_date}")
+    print("=" * 60)
+
+    # Scrape results
+    print("\n[STEP 1] Scrape results from Racing Post")
+    print("-" * 40)
+    ok, result_data = test_endpoint(
+        f"Scrape results ({target_date})",
+        "POST",
+        f"{api_url}/scrape/",
+        json_data={"date": target_date, "region": "gb", "race_type": "all", "betfair": True},
+        expect_key="races_created"
+    )
+
+    if not ok:
+        log("PM JOB FAILED", "FAIL")
+        return False
+
+    # Summary
+    print("\n[RESULT]")
+    print("-" * 40)
+    log(f"Races created: {result_data.get('races_created', 0)}")
+    log(f"Races updated: {result_data.get('races_updated', 0)}")
+    log(f"Runs created: {result_data.get('runs_created', 0)}")
+    log(f"Runs updated: {result_data.get('runs_updated', 0)}")
+
+    errors = result_data.get("errors", [])
+    if errors:
+        log(f"Errors: {len(errors)}", "WARN")
+        for e in errors[:3]:
+            log(f"  - {e}", "WARN")
+
+    print("\n" + "=" * 60)
+    log("PM JOB COMPLETE", "OK")
+    print("=" * 60)
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(description="Test Racing Post API")
     parser.add_argument("--api-url", default="http://localhost:8000/api/racing-post",
                         help="API base URL")
+    parser.add_argument("--am", action="store_true",
+                        help="Test AM job only (scrape racecards + sync)")
+    parser.add_argument("--pm", action="store_true",
+                        help="Test PM job only (scrape results)")
+    parser.add_argument("--date", help="Date for PM job (YYYY/MM/DD), default: yesterday")
     parser.add_argument("--skip-scrape", action="store_true",
                         help="Skip scraping tests (just test GET endpoints)")
     args = parser.parse_args()
 
     API = args.api_url.rstrip("/")
+
+    # Run specific job tests if requested
+    if args.am:
+        success = test_am_job(API)
+        sys.exit(0 if success else 1)
+
+    if args.pm:
+        success = test_pm_job(API, args.date)
+        sys.exit(0 if success else 1)
 
     print("=" * 60)
     print("RACING POST API TEST")
