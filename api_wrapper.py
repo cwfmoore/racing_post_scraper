@@ -95,6 +95,53 @@ class RacingPostAPI:
         payload = {"races": races}
         return self._post("/sync/", payload)
 
+    def scrape_racecards(
+        self,
+        day: int,
+        region: str | None = None,
+        fetch_stats: bool = False,
+        fetch_profiles: bool = False,
+    ) -> APIResponse:
+        """
+        Scrape racecards from Racing Post.
+
+        Args:
+            day: 1 = today, 2 = tomorrow
+            region: Optional region filter (gb, ire, etc.)
+            fetch_stats: Include C/D/G and P/L stats
+            fetch_profiles: Include medical/history
+
+        Returns:
+            APIResponse with scraped racecard data
+        """
+        payload = {
+            "day": day,
+            "region": region,
+            "fetch_stats": fetch_stats,
+            "fetch_profiles": fetch_profiles,
+        }
+        return self._post("/scrape-racecards/", payload)
+
+    def sync_racecards(
+        self,
+        data: dict,
+        scrape_date: str | None = None,
+    ) -> APIResponse:
+        """
+        Sync racecard data to the database.
+
+        Args:
+            data: Racecard JSON from scrape_racecards()
+            scrape_date: Optional date string (YYYY-MM-DD)
+
+        Returns:
+            APIResponse with import results
+        """
+        payload = {"data": data}
+        if scrape_date:
+            payload["scrape_date"] = scrape_date
+        return self._post("/sync-racecards/", payload)
+
     # =========================================================================
     # Course Endpoints
     # =========================================================================
@@ -343,6 +390,202 @@ class RacingPostAPI:
     def get_betfair_price(self, run_id: int) -> APIResponse:
         """Get Betfair price for a run."""
         return self._get(f"/betfair-prices/{run_id}/")
+
+    # =========================================================================
+    # Racecard Entry Endpoints
+    # =========================================================================
+
+    def get_racecard_entries(
+        self,
+        race_id: int | None = None,
+        horse_id: int | None = None,
+        scrape_date: str | None = None,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> APIResponse:
+        """Get racecard entries (pre-race snapshots)."""
+        params = self._build_params(
+            race_id=race_id,
+            horse_id=horse_id,
+            scrape_date=scrape_date,
+            page=page,
+            page_size=page_size,
+        )
+        return self._get("/racecard-entries/", params)
+
+    def get_racecard_entry(self, entry_id: int) -> APIResponse:
+        """Get a single racecard entry by ID."""
+        return self._get(f"/racecard-entries/{entry_id}/")
+
+    # =========================================================================
+    # Horse Race Stats Endpoints (C/D/G)
+    # =========================================================================
+
+    def get_horse_race_stats(
+        self,
+        race_id: int | None = None,
+        horse_id: int | None = None,
+        scrape_date: str | None = None,
+        has_course_wins: bool | None = None,
+        has_distance_wins: bool | None = None,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> APIResponse:
+        """Get horse race stats (C/D/G records)."""
+        params = self._build_params(
+            race_id=race_id,
+            horse_id=horse_id,
+            scrape_date=scrape_date,
+            has_course_wins=has_course_wins,
+            has_distance_wins=has_distance_wins,
+            page=page,
+            page_size=page_size,
+        )
+        return self._get("/horse-race-stats/", params)
+
+    def get_horse_race_stat(self, stat_id: int) -> APIResponse:
+        """Get a single horse race stat by ID."""
+        return self._get(f"/horse-race-stats/{stat_id}/")
+
+    # =========================================================================
+    # Jockey Stats Daily Endpoints
+    # =========================================================================
+
+    def get_jockey_stats_daily(
+        self,
+        jockey_id: int | None = None,
+        scrape_date: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> APIResponse:
+        """Get jockey daily stats (P/L snapshots)."""
+        params = self._build_params(
+            jockey_id=jockey_id,
+            scrape_date=scrape_date,
+            date_from=date_from,
+            date_to=date_to,
+            page=page,
+            page_size=page_size,
+        )
+        return self._get("/jockey-stats/", params)
+
+    def get_jockey_stat_daily(self, stat_id: int) -> APIResponse:
+        """Get a single jockey daily stat by ID."""
+        return self._get(f"/jockey-stats/{stat_id}/")
+
+    # =========================================================================
+    # Trainer Stats Daily Endpoints
+    # =========================================================================
+
+    def get_trainer_stats_daily(
+        self,
+        trainer_id: int | None = None,
+        scrape_date: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> APIResponse:
+        """Get trainer daily stats (P/L snapshots)."""
+        params = self._build_params(
+            trainer_id=trainer_id,
+            scrape_date=scrape_date,
+            date_from=date_from,
+            date_to=date_to,
+            page=page,
+            page_size=page_size,
+        )
+        return self._get("/trainer-stats/", params)
+
+    def get_trainer_stat_daily(self, stat_id: int) -> APIResponse:
+        """Get a single trainer daily stat by ID."""
+        return self._get(f"/trainer-stats/{stat_id}/")
+
+    # =========================================================================
+    # Trainer History Endpoints
+    # =========================================================================
+
+    def get_trainer_history(
+        self,
+        horse_id: int | None = None,
+        trainer_id: int | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> APIResponse:
+        """Get horse trainer change history."""
+        params = self._build_params(
+            horse_id=horse_id,
+            trainer_id=trainer_id,
+            date_from=date_from,
+            date_to=date_to,
+            page=page,
+            page_size=page_size,
+        )
+        return self._get("/trainer-history/", params)
+
+    def get_trainer_history_record(self, record_id: int) -> APIResponse:
+        """Get a single trainer history record by ID."""
+        return self._get(f"/trainer-history/{record_id}/")
+
+    # =========================================================================
+    # Owner History Endpoints
+    # =========================================================================
+
+    def get_owner_history(
+        self,
+        horse_id: int | None = None,
+        owner_id: int | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> APIResponse:
+        """Get horse owner change history."""
+        params = self._build_params(
+            horse_id=horse_id,
+            owner_id=owner_id,
+            date_from=date_from,
+            date_to=date_to,
+            page=page,
+            page_size=page_size,
+        )
+        return self._get("/owner-history/", params)
+
+    def get_owner_history_record(self, record_id: int) -> APIResponse:
+        """Get a single owner history record by ID."""
+        return self._get(f"/owner-history/{record_id}/")
+
+    # =========================================================================
+    # Medical Endpoints
+    # =========================================================================
+
+    def get_medical_records(
+        self,
+        horse_id: int | None = None,
+        procedure_type: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> APIResponse:
+        """Get horse medical records."""
+        params = self._build_params(
+            horse_id=horse_id,
+            procedure_type=procedure_type,
+            date_from=date_from,
+            date_to=date_to,
+            page=page,
+            page_size=page_size,
+        )
+        return self._get("/medical/", params)
+
+    def get_medical_record(self, record_id: int) -> APIResponse:
+        """Get a single medical record by ID."""
+        return self._get(f"/medical/{record_id}/")
 
     # =========================================================================
     # Betfair Mapping Endpoints

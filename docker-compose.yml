@@ -1,0 +1,34 @@
+# Racing Post Scraper
+#
+# This container is triggered by host cron, not run continuously.
+#
+# Usage:
+#   docker compose run --rm scraper am    # AM job
+#   docker compose run --rm scraper pm    # PM job
+#
+# Crontab (on NAS host):
+#   0 6 * * *  cd /path/to/racing_post_scraper && docker compose run --rm scraper am >> logs/cron.log 2>&1
+#   0 22 * * * cd /path/to/racing_post_scraper && docker compose run --rm scraper pm >> logs/cron.log 2>&1
+
+services:
+  scraper:
+    build: .
+    container_name: rpscrape
+
+    environment:
+      # API endpoint (nas_api_003 Django server)
+      - API_URL=${API_URL:-http://host.docker.internal:8000/api/racing-post}
+      - REGION=${REGION:-gb}
+
+      # Racing Post credentials
+      - EMAIL=${EMAIL}
+      - AUTH_STATE=${AUTH_STATE}
+      - ACCESS_TOKEN=${ACCESS_TOKEN}
+
+    # Allow access to host network (to reach nas_api_003)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    volumes:
+      # Logs
+      - ./logs:/app/logs
