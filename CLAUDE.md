@@ -115,3 +115,160 @@ Get tokens from browser dev tools → Storage → Cookies after logging into Rac
 - `-r` (region) and `-c` (course) are mutually exclusive
 - Year mode requires `-t flat|jumps`
 - NetworkClient randomizes browser types and has built-in retry with exponential backoff for 406 errors
+
+## Data Collection Strategy
+
+### What Each Scraper Provides
+
+| Scraper | Output | Data |
+|---------|--------|------|
+| `rpscrape.py` | CSV | Results, SP, BSP, finishing positions, connections |
+| `racecards.py` | JSON | Pre-race entries, stats (C/D/G), jockey/trainer P/L, profiles |
+
+### Time-Sensitive Data ⚠️
+
+| Data | Backfillable? | Source |
+|------|---------------|--------|
+| Race results | ✅ Yes - anytime | rpscrape.py |
+| BSP/Betfair prices | ✅ Yes - anytime | rpscrape.py |
+| Jockey/Trainer P/L | ❌ **No** - day of race only | racecards.py |
+| C/D/G stats | ❌ **No** - day of race only | racecards.py |
+| Racecard entries | ❌ **No** - pre-race only | racecards.py |
+
+**Critical:** Stats from racecards.py are point-in-time snapshots. Miss a day = data lost forever.
+
+### Recommended Daily Schedule
+
+| Time | Task | Command |
+|------|------|---------|
+| 🌅 Morning (before racing) | Scrape racecards + stats | `racecards.py --day 1 --region gb` |
+| 🌙 Evening (after racing) | Scrape yesterday's results | `rpscrape.py -d YYYY/MM/DD -r gb` |
+
+### Settings for Full Data Collection
+
+```toml
+# user_settings.toml
+betfair_data = true    # Include BSP in historical CSV
+
+# user_racecard_settings.toml
+fetch_stats = true     # Jockey/trainer P/L, C/D/G
+fetch_profiles = true  # Medical history, trainer changes
+```
+
+### Related Documentation
+
+Full database schema (17 tables) documented in:
+`C:\Users\Craig\OneDrive - West Lothian College\Obsidian\cmoore\Betfair Analysis Platform\2026-01-08 - Racing Post Database Schema.md`
+
+## Linking to Betfair IDs
+
+### The Problem
+
+Racing Post uses `horse_id` and `race_id`. Betfair uses `selection_id` and `market_id`. To join datasets, you need a mapping.
+
+### The Solution: Name Matching
+
+```
+Racing Post                           Betfair
+───────────                           ───────
+race_id: 909776        ──────────►    market_id: 1.234567890
+horse_id: 1234567      ──────────►    selection_id: 12345678
+horse_name: "Saint Patrick (IRE)"     runner_name: "St Patrick"
+```
+
+**Note:** `selection_id` changes every market - it's NOT a permanent ID. Must match per-race.
+
+### Name Normalization
+
+Before comparing names, normalize both sides:
+
+| Step | Example |
+|------|---------|
+| Remove country code | `(IRE)`, `(FR)` → removed |
+| Lowercase | `FRANKEL` → `frankel` |
+| Accents → ASCII | `étoile` → `etoile` |
+| Abbreviations | `Saint` → `st` |
+| Remove punctuation | `King's` → `kings` |
+
+### Matching Logic
+
+```
+1. Normalize Racing Post name
+2. Normalize Betfair runner name
+3. Compare:
+   - Exact match? → 100% confidence
+   - Fuzzy match ≥95%? → Accept with confidence score
+   - Below 95%? → Flag for manual review
+```
+
+**Library:** `rapidfuzz` with `token_sort_ratio` (handles word order differences)
+
+### Existing Implementation
+
+Name matching logic already exists in the API codebase:
+- **File:** `nas_api_003/oddschecker/services/runner_matching.py`
+- **Function:** `normalize_name()`
+- **Threshold:** 95% match confidence
+
+### Database Table: `betfair_rp_mapping`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `race_id` | INT | Racing Post race ID |
+| `horse_id` | INT | Racing Post horse ID |
+| `market_id` | VARCHAR | Betfair market ID |
+| `selection_id` | BIGINT | Betfair selection ID |
+| `match_confidence` | DECIMAL | 0.0 - 1.0 |
+| `match_method` | VARCHAR | 'exact', 'fuzzy', 'manual' |
+| `needs_review` | BOOLEAN | Flag low-confidence matches |
+
+**Unique constraint:** `(race_id, horse_id)`
+
+## Development & Production Workflow
+
+### Two-Machine Setup
+
+| Machine | OS | Purpose |
+|---------|-----|---------|
+| **Windows** | Windows | Development & testing |
+| **Linux (NAS)** | Linux | Production (scheduled scraping) |
+
+Both machines use the **same codebase** via git.
+
+### Related Codebases
+
+| Codebase | Location | Purpose |
+|----------|----------|---------|
+| racing_post_scraper | This repo | Scrapes Racing Post data |
+| nas_api_003 | `C:\Users\Craig\Documents\Python\nas_api_003` | Django API + PostgreSQL database |
+
+The scraper outputs CSV/JSON files. These feed into the API database via parsing scripts.
+
+### Environment Files
+
+| File | Purpose | In Git? |
+|------|---------|---------|
+| `.env` | Racing Post credentials | ❌ No (.gitignore) |
+
+**Note:** Same `.env` structure on both machines (Racing Post login credentials).
+
+### Deployment Workflow
+
+```
+WINDOWS (dev)                         LINUX (prod)
+─────────────                         ────────────
+
+1. Make code changes
+2. Test scraper locally
+3. git commit & push
+                                      4. git pull
+                                      5. Scheduler runs scraper
+```
+
+### Key Rules
+
+| Rule | Reason |
+|------|--------|
+| Test scraper changes on dev first | Avoid breaking scheduled jobs |
+| Keep `.env` synced manually | Same credentials both machines |
+| Output files are gitignored | Only code in repo |
