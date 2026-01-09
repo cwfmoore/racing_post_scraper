@@ -13,7 +13,7 @@
 services:
   scraper:
     build: .
-    container_name: rpscrape
+    container_name: racing-post-scraper
 
     environment:
       # API endpoint (nas_api_003 Django server)

@@ -50,7 +50,7 @@ case "$JOB" in
         ;;
 
     pm|results)
-        DATE="${2:-$(date -d 'yesterday' '+%Y/%m/%d')}"
+        DATE="${2:-$(date '+%Y/%m/%d')}"
         log "PM JOB: Scraping results for $DATE, region=$REGION"
 
         RESULT=$(curl -sf -X POST "$API_URL/scrape/" \
