@@ -36,13 +36,12 @@ case "$JOB" in
             exit 0
         fi
 
-        # Sync to database
+        # Sync to database (pipe data to curl to avoid argument length limits)
         log "Step 2: Syncing to database..."
-        DATA=$(echo "$SCRAPE" | python3 -c "import sys,json; import json as j; d=json.load(sys.stdin); print(j.dumps({'data':d.get('data',{}),'scrape_date':d.get('date','')}))")
-
-        SYNC=$(curl -sf -X POST "$API_URL/sync-racecards/" \
+        SYNC=$(echo "$SCRAPE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps({'data':d.get('data',{}),'scrape_date':d.get('date','')}))" | \
+            curl -sf -X POST "$API_URL/sync-racecards/" \
             -H "Content-Type: application/json" \
-            -d "$DATA" \
+            --data-binary @- \
             --max-time 300)
 
         ENTRIES=$(echo "$SYNC" | python3 -c "import sys,json; print(json.load(sys.stdin).get('entries_created',0))")
