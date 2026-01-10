@@ -18,7 +18,7 @@ services:
     environment:
       # API endpoint (nas_api_003 Django server)
       - API_URL=${API_URL:-http://host.docker.internal:8000/api/racing-post}
-      - REGION=${REGION:-gb}
+      - REGIONS=${REGIONS:-gb,ire}
 
       # Racing Post credentials
       - EMAIL=${EMAIL}
