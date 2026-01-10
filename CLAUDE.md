@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ PUBLIC REPOSITORY WARNING
+
+**This is a PUBLIC GitHub repo.** Never commit:
+- API keys, tokens, passwords
+- Internal IP addresses (e.g., 192.168.x.x)
+- Email addresses
+- Any credentials or secrets
+
+All sensitive data must go in `.env` (gitignored).
+
 ## Response Style
 
 All responses must be ADHD-friendly:
