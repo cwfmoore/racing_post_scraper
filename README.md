@@ -1,6 +1,13 @@
 # 🏇 Racing Post Scraper
 
-Automated scraper for Racing Post horse racing data. Collects racecards (pre-race) and results (post-race) for GB and Ireland.
+> **Fork of [joenano/rpscrape](https://github.com/joenano/rpscrape)** with Docker support, API integration, and automated scheduling.
+
+Scrapes historical horse racing data from Racing Post. This fork adds:
+- 🐳 Docker containerization
+- 🔗 API sync to PostgreSQL database
+- ⏰ Automated cron scheduling (GB + Ireland)
+- 🔄 Retry logic with exponential backoff
+- 🧪 Database integrity tests
 
 ---
 
@@ -337,6 +344,14 @@ curl http://localhost:8000/api/racing-post/courses/
 > For jumps racing, the year refers to **season start**.
 >
 > Example: 2025 Cheltenham Festival → Use `-y 2024` (2024-25 season)
+
+---
+
+## 🙏 Credits
+
+This project is a fork of [joenano/rpscrape](https://github.com/joenano/rpscrape).
+
+Original tool provides the core scraping functionality. This fork adds containerization, API integration, and production scheduling features.
 
 ---
 
