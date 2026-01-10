@@ -21,7 +21,7 @@ from collections import defaultdict
 # CONFIG
 # ═══════════════════════════════════════════════════════════════════════════════
 
-API_BASE = "http://localhost:8000/api/racing-post"
+API_BASE = os.getenv("API_URL", "http://localhost:8000/api/racing-post")
 
 ENDPOINTS = {
     # Core Reference

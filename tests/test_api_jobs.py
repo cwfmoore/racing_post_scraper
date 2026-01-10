@@ -7,6 +7,7 @@ Run: python tests/test_api_jobs.py
 """
 
 import sys
+import os
 import json
 from datetime import datetime, timedelta
 
@@ -20,7 +21,7 @@ import requests
 # CONFIG
 # ═══════════════════════════════════════════════════════════════════════════════
 
-API_BASE = "http://localhost:8000/api/racing-post"
+API_BASE = os.getenv("API_URL", "http://localhost:8000/api/racing-post")
 REGION = "gb"
 TIMEOUT = 300  # 5 minutes for scraping
 

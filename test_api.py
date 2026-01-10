@@ -7,7 +7,7 @@ Usage:
     python test_api.py --am               # Test AM job (racecards)
     python test_api.py --pm               # Test PM job (results)
     python test_api.py --skip-scrape      # Skip scraping, just test GETs
-    python test_api.py --api-url http://localhost:8000/api/racing-post
+    python test_api.py --api-url http://YOUR_API_IP:8000/api/racing-post
 """
 import argparse
 import json
