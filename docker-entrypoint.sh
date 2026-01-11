@@ -45,6 +45,7 @@ log_success() {
 
 # Retry a command with exponential backoff
 # Usage: retry_with_backoff "description" command [args...]
+# NOTE: All logs go to stderr to avoid polluting the JSON response on stdout
 retry_with_backoff() {
     local description="$1"
     shift
@@ -56,7 +57,7 @@ retry_with_backoff() {
     local result=""
 
     while [ $total_wait -lt $MAX_RETRY_SECS ]; do
-        log "Attempt $attempt: $description"
+        log "Attempt $attempt: $description" >&2
 
         # Run command and capture output
         if result=$("${cmd[@]}" 2>&1); then
@@ -65,10 +66,10 @@ retry_with_backoff() {
                 echo "$result"
                 return 0
             else
-                log_warn "Invalid JSON response, retrying..."
+                log_warn "Invalid JSON response, retrying..." >&2
             fi
         else
-            log_warn "Command failed (exit code: $?)"
+            log_warn "Command failed (exit code: $?)" >&2
         fi
 
         # Check if we've exceeded max time
@@ -79,7 +80,7 @@ retry_with_backoff() {
         fi
 
         # Wait with backoff
-        log "Waiting ${backoff}s before retry (total wait: ${total_wait}s / ${MAX_RETRY_SECS}s)..."
+        log "Waiting ${backoff}s before retry (total wait: ${total_wait}s / ${MAX_RETRY_SECS}s)..." >&2
         sleep $backoff
 
         # Exponential backoff, capped at max
