@@ -1,17 +1,41 @@
-# 🏇 Racing Post Scraper
+# Racing Post Scraper
 
 > **Fork of [joenano/rpscrape](https://github.com/joenano/rpscrape)** with Docker support, API integration, and automated scheduling.
 
 Scrapes historical horse racing data from Racing Post. This fork adds:
-- 🐳 Docker containerization
-- 🔗 API sync to PostgreSQL database
-- ⏰ Automated cron scheduling (GB + Ireland)
-- 🔄 Retry logic with exponential backoff
-- 🧪 Database integrity tests
+- Docker containerization
+- API sync to PostgreSQL database
+- Automated cron scheduling (GB + Ireland)
+- Retry logic with exponential backoff
+- Error logging with daily rotation
 
 ---
 
-## ⚡ Quick Start
+## Table of Contents
+
+| Section | Description |
+|---------|-------------|
+| [Quick Start](#-quick-start) | Get running in 2 minutes |
+| [Installation](#-installation) | Docker and manual setup |
+| [Authentication](#-authentication) | Racing Post credentials |
+| [Docker Usage](#-docker-usage) | Commands and environment |
+| [Cron Jobs](#-cron-jobs) | Automated scheduling |
+| [Retry Logic](#-retry-logic) | Built-in resilience |
+| [Error Logging](#-error-logging) | Daily log files with retention |
+| [Manual Scraper Usage](#-manual-scraper-usage) | CLI reference |
+| [Regions](#-regions) | Supported regions |
+| [Data Collected](#-data-collected) | Fields and outputs |
+| [Settings](#%EF%B8%8F-settings) | Configuration options |
+| [Project Structure](#%EF%B8%8F-project-structure) | File organization |
+| [Testing](#-testing) | Test commands |
+| [API Integration](#-api-integration) | Database sync |
+| [Troubleshooting](#%EF%B8%8F-troubleshooting) | Common issues |
+| [Credits](#-credits) | Attribution |
+| [License](#-license) | MIT |
+
+---
+
+## Quick Start
 
 ```bash
 # Docker (recommended)
@@ -25,7 +49,7 @@ python scripts/racecards.py --day 1 --region gb
 
 ---
 
-## 📦 Installation
+## Installation
 
 ### Docker (Recommended)
 
@@ -50,7 +74,7 @@ pip install -r requirements.txt
 
 ---
 
-## 🔐 Authentication
+## Authentication
 
 Create `.env` file with Racing Post credentials:
 
@@ -61,13 +85,13 @@ ACCESS_TOKEN=your_cognito_access_token
 ```
 
 > [!TIP]
-> **Finding tokens:** Login to Racing Post → DevTools (F12) → Storage → Cookies
-> - `auth_state` → Copy value
-> - `CognitoIdentityServiceProvider...accessToken` → Copy value
+> **Finding tokens:** Login to Racing Post > DevTools (F12) > Storage > Cookies
+> - `auth_state` > Copy value
+> - `CognitoIdentityServiceProvider...accessToken` > Copy value
 
 ---
 
-## 🐳 Docker Usage
+## Docker Usage
 
 ### Commands
 
@@ -92,7 +116,7 @@ REGIONS=gb docker compose run --rm scraper racecards
 
 ---
 
-## ⏰ Cron Jobs
+## Cron Jobs
 
 ```bash
 # Recommended schedule (crontab -e)
@@ -110,7 +134,7 @@ REGIONS=gb docker compose run --rm scraper racecards
 
 ---
 
-## 🔄 Retry Logic
+## Retry Logic
 
 Built-in resilience for network failures:
 
@@ -119,16 +143,65 @@ Built-in resilience for network failures:
 | Max retry time | 23 hours |
 | Initial backoff | 1 minute |
 | Max backoff | 30 minutes |
-| Pattern | 1m → 2m → 4m → 8m → 16m → 30m → 30m... |
+| Pattern | 1m > 2m > 4m > 8m > 16m > 30m > 30m... |
 
 > [!IMPORTANT]
 > Each region processed independently. If GB fails, IRE still runs.
 
 ---
 
-## 📜 Manual Scraper Usage
+## Error Logging
 
-### Results (`rpscrape.py`)
+Standardized logging system with daily file rotation:
+
+### Log Levels
+
+| Level | Console | File | Use Case |
+|-------|---------|------|----------|
+| `INFO` | Yes | No | Normal operations |
+| `WARNING` | Yes | Yes | Unexpected but handled |
+| `ERROR` | Yes | Yes | Operation failures |
+
+### Log Format
+
+```
+LEVEL    [YYYY-MM-DD HH:MM:SS] module: message
+```
+
+Example:
+```
+INFO     [2026-01-11 14:32:14] rpscrape: Scraping races
+WARNING  [2026-01-11 14:32:15] network: 406 error (attempt 2/7): https://...
+ERROR    [2026-01-11 14:32:16] profiles: Failed to get profiles
+```
+
+### File Location
+
+| Environment | Path |
+|-------------|------|
+| Docker | `./error_logs/` (mounted volume) |
+| Manual | `error_logs/` in project root |
+
+Files named `YYYY-MM-DD_error_log.txt` with 90-day automatic retention.
+
+### Searching Logs
+
+```bash
+# Today's errors
+cat error_logs/$(date +%Y-%m-%d)_error_log.txt
+
+# Search all logs
+grep -r "406" error_logs/
+
+# Count errors per day
+wc -l error_logs/*_error_log.txt
+```
+
+---
+
+## Manual Scraper Usage
+
+### Results (rpscrape.py)
 
 ```bash
 # Single date
@@ -150,7 +223,7 @@ python scripts/rpscrape.py -c 2 -y 2020-2025 -t jumps
 python scripts/rpscrape.py --date-file dates.txt
 ```
 
-### Racecards (`racecards.py`)
+### Racecards (racecards.py)
 
 ```bash
 python scripts/racecards.py --day 1              # Today
@@ -170,7 +243,7 @@ python scripts/rpscrape.py --courses gb          # Courses in region
 
 ---
 
-## 🌍 Regions
+## Regions
 
 | Code | Region |
 |------|--------|
@@ -185,7 +258,7 @@ python scripts/rpscrape.py --courses gb          # Courses in region
 
 ---
 
-## 📊 Data Collected
+## Data Collected
 
 ### Racecards
 
@@ -209,7 +282,7 @@ python scripts/rpscrape.py --courses gb          # Courses in region
 
 ---
 
-## ⚙️ Settings
+## Settings
 
 ### Results Settings
 
@@ -221,6 +294,8 @@ cp settings/default_settings.toml settings/user_settings.toml
 Key options:
 ```toml
 betfair_data = true   # Include BSP prices
+gzip_output = false   # Compress output files
+
 [fields.runner_info]
 sire_id = true        # Include pedigree IDs
 dam_id = true
@@ -246,7 +321,7 @@ breeding = true        # Sire, dam, damsire
 
 ---
 
-## 🗂️ Project Structure
+## Project Structure
 
 ```
 racing_post_scraper/
@@ -258,8 +333,9 @@ racing_post_scraper/
 ├── scripts/
 │   ├── rpscrape.py          # Results scraper
 │   ├── racecards.py         # Racecard scraper
+│   ├── logging_config.py    # Logging setup
 │   ├── models/              # Data models
-│   └── utils/               # Network, parsing helpers
+│   └── utils/               # Network, parsing, logging handlers
 │
 ├── settings/
 │   ├── default_settings.toml
@@ -272,12 +348,13 @@ racing_post_scraper/
 │
 ├── data/                    # CSV output (manual scraper)
 ├── racecards/               # JSON output (racecard scraper)
+├── error_logs/              # Error log files (WARNING+)
 └── logs/                    # Cron logs
 ```
 
 ---
 
-## 🧪 Testing
+## Testing
 
 ### Test Full Pipeline
 
@@ -286,10 +363,10 @@ python tests/test_api_jobs.py
 ```
 
 Runs racecards + results jobs, verifies:
-- ✅ API connectivity
-- ✅ Data synced
-- ✅ Pedigree saved
-- ✅ No duplicates
+- API connectivity
+- Data synced
+- Pedigree saved
+- No duplicates
 
 ### Test Database Only
 
@@ -299,7 +376,7 @@ python tests/test_database_integrity.py
 
 ---
 
-## 🔗 API Integration
+## API Integration
 
 Syncs to [nas_api_003](https://github.com/cwfmoore/nas_api_003) Django API.
 
@@ -311,9 +388,9 @@ Syncs to [nas_api_003](https://github.com/cwfmoore/nas_api_003) Django API.
 
 ---
 
-## ⚠️ Troubleshooting
+## Troubleshooting
 
-### 🔴 403 Forbidden
+### 403 Forbidden
 
 **Cause:** Expired tokens
 
@@ -321,7 +398,7 @@ Syncs to [nas_api_003](https://github.com/cwfmoore/nas_api_003) Django API.
 
 ---
 
-### 🔴 No races found
+### No races found
 
 **Cause:** No racing scheduled
 
@@ -329,7 +406,7 @@ Syncs to [nas_api_003](https://github.com/cwfmoore/nas_api_003) Django API.
 
 ---
 
-### 🔴 API connection failed
+### API connection failed
 
 **Fix:** Check API is running:
 ```bash
@@ -338,23 +415,34 @@ curl http://localhost:8000/api/racing-post/courses/
 
 ---
 
-### 🔴 Jumps year confusion
+### Jumps year confusion
 
 > [!WARNING]
 > For jumps racing, the year refers to **season start**.
 >
-> Example: 2025 Cheltenham Festival → Use `-y 2024` (2024-25 season)
+> Example: 2025 Cheltenham Festival > Use `-y 2024` (2024-25 season)
 
 ---
 
-## 🙏 Credits
+### Persistent 406 errors
+
+**Cause:** Racing Post rate limiting or blocking
+
+**Fix:** The scraper automatically retries with exponential backoff. Check `error_logs/` for details:
+```bash
+grep "406" error_logs/*.txt
+```
+
+---
+
+## Credits
 
 This project is a fork of [joenano/rpscrape](https://github.com/joenano/rpscrape).
 
-Original tool provides the core scraping functionality. This fork adds containerization, API integration, and production scheduling features.
+Original tool provides the core scraping functionality. This fork adds containerization, API integration, error logging, and production scheduling features.
 
 ---
 
-## 📝 License
+## License
 
 MIT

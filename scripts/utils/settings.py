@@ -1,8 +1,11 @@
+import logging
 import tomli
 
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 _settings_path = Path(__file__).parent.parent.parent / 'settings'
 
@@ -46,5 +49,5 @@ class Settings:
             with open(path, 'rb') as f:
                 return tomli.load(f)
         except tomli.TOMLDecodeError:
-            print(f'TomlParseError: {path}')
+            logger.error(f'TomlParseError: {path}')
             return None

@@ -15,6 +15,7 @@ from orjson import dumps
 from tqdm import tqdm
 from typing import Any
 
+from logging_config import setup_logging, get_logger
 from utils.cleaning import clean_string
 from utils.course import valid_meeting
 from utils.going import get_surface
@@ -25,6 +26,8 @@ from utils.region import get_region, valid_region
 from utils.stats import Stats
 
 from models.racecard import Racecard, Runner
+
+logger = get_logger(__name__)
 
 _ = load_dotenv()
 
@@ -90,7 +93,7 @@ def get_race_urls(
         status, response = client.get(url)
 
         if status != 200 or not response.content:
-            print(f'Failed to get racecards for {date} (status: {status})')
+            logger.warning(f'Failed to get racecards for {date} (status: {status})')
             continue
 
         doc = html.fromstring(response.content)
@@ -182,8 +185,8 @@ def parse_runners(
             try:
                 profile = profiles[runner_json['horseUid']]
             except KeyError:
-                print(f'Failed to find profile: {runner_json["horseUid"]} - {runner_json["horseName"]}')
-                print(dumps(runner_json).decode('utf-8'))
+                logger.error(f'Failed to find profile: {runner_json["horseUid"]} - {runner_json["horseName"]}')
+                logger.error(dumps(runner_json).decode('utf-8'))
                 sys.exit(1)
 
         runner = Runner()
@@ -392,9 +395,8 @@ def scrape_racecards(
         status_runners, resp_runners = client.get(url_runners)
 
         if status_racecard != 200 or status_runners != 200:
-            print('Failed to get racecard data.')
-            print(f'status: {status_racecard} url: {url_racecard}')
-            print(f'status: {status_runners} url: {url_runners}')
+            logger.warning(f'Failed to get racecard data. racecard: {status_racecard}, runners: {status_runners}')
+            logger.warning(f'URLs: {url_racecard}, {url_runners}')
             continue
 
         status_accordion = None
@@ -406,8 +408,7 @@ def scrape_racecards(
         try:
             doc = html.fromstring(resp_racecard.content)
         except etree.ParserError:
-            print('Failed to parse HTML for racecard.')
-            print(f'url: {url_racecard}')
+            logger.warning(f'Failed to parse HTML for racecard: {url_racecard}')
             continue
 
         doc_accordion = None
@@ -415,6 +416,7 @@ def scrape_racecards(
             try:
                 doc_accordion = html.fromstring(resp_accordion.content)
             except etree.ParserError:
+                logger.warning(f'Failed to parse accordion HTML for race {race_id}')
                 doc_accordion = None
 
         try:
@@ -422,8 +424,7 @@ def scrape_racecards(
             runners = list(runners_map.values())
             race_meta = runners[0]
         except (KeyError, IndexError, ValueError):
-            print('Failed to parse JSON for runners.')
-            print(f'url: {url_runners}')
+            logger.warning(f'Failed to parse JSON for runners: {url_runners}')
             continue
 
         profiles: dict[str, dict[str, Any]] = {}
@@ -482,6 +483,8 @@ def scrape_racecards(
 
 
 def main() -> None:
+    setup_logging()
+
     parser = argparse.ArgumentParser(
         description='Scrape racecards for a single day or a range of days.',
         formatter_class=argparse.RawTextHelpFormatter,
@@ -530,7 +533,7 @@ def main() -> None:
     region = args.region.lower() if args.region else None
 
     if region and not valid_region(region):
-        print(f'Invalid region: {args.region}')
+        logger.error(f'Invalid region: {args.region}')
         sys.exit(1)
 
     email = os.getenv('EMAIL')

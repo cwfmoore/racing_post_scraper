@@ -1,3 +1,4 @@
+import logging
 import sys
 
 from typing import Any, NoReturn
@@ -5,6 +6,8 @@ from orjson import loads
 from lxml import html
 
 from utils.network import NetworkClient
+
+logger = logging.getLogger(__name__)
 
 
 def get_profiles(client: NetworkClient, urls: list[str]) -> dict[str, dict[str, Any]]:
@@ -53,5 +56,5 @@ def _extract_json_string(script_text: str) -> str:
 
 
 def _exit_with_error(message: str) -> NoReturn:
-    print(message, file=sys.stderr)
+    logger.error(message)
     sys.exit(1)

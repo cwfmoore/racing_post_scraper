@@ -32,3 +32,5 @@ services:
     volumes:
       # Logs
       - ./logs:/app/logs
+      # Error logs (persistent for debugging)
+      - ./error_logs:/app/error_logs

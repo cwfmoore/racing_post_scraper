@@ -1,3 +1,4 @@
+import logging
 import sys
 
 from datetime import datetime
@@ -17,6 +18,8 @@ from utils.lps import get_lps_scale
 from utils.lxml_funcs import find
 from utils.network import NetworkClient
 from utils.region import get_region
+
+logger = logging.getLogger(__name__)
 
 
 regex_class = r'(\(|\s)(C|c)lass (\d|[A-Ha-h])(\)|\s)'
@@ -397,9 +400,8 @@ class Race:
         try:
             dist_f = distance_to_furlongs(dist)
         except ValueError:
-            print('ERROR: distance_to_furlongs()')
-            print('Race: ', self.url)
-            sys.exit()
+            logger.error(f'distance_to_furlongs() failed for race: {self.url}')
+            sys.exit(1)
 
         dist_m = distance_to_metres(dist_y)
 

@@ -23,6 +23,9 @@ COPY settings/ ./settings/
 COPY docker-entrypoint.sh .
 RUN chmod +x docker-entrypoint.sh
 
+# Create error logs directory
+RUN mkdir -p /app/error_logs
+
 # Environment
 ENV PYTHONUNBUFFERED=1
 ENV TZ=Europe/London

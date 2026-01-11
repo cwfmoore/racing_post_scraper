@@ -20,6 +20,49 @@ All responses must be ADHD-friendly:
 - **Emojis** - Use to highlight key points and improve scannability
 - **Colors** - Use markdown formatting for emphasis
 
+## ⚠️ SQL Safety Rules
+
+**NEVER guess table names, column names, or SQL syntax.** This could cause data loss.
+
+- Always query the database schema first before writing SQL
+- Use `SELECT tablename FROM pg_tables WHERE schemaname = 'public'` to list tables
+- Use `\d tablename` or query `information_schema.columns` for column names
+- Ask the user to verify table names if uncertain
+
+### Racing Post Tables (rp_*)
+
+| Table | Description |
+|-------|-------------|
+| `rp_course` | Race courses/tracks |
+| `rp_horse` | Horse records |
+| `rp_jockey` | Jockey records |
+| `rp_trainer` | Trainer records |
+| `rp_owner` | Owner records |
+| `rp_breeder` | Breeder records |
+| `rp_race` | Race events |
+| `rp_run` | Individual horse runs in races |
+| `rp_racecard_entry` | Pre-race entries (point-in-time) |
+| `rp_horse_race_stats` | C/D/G stats per horse per race |
+| `rp_jockey_stats_daily` | Jockey P/L snapshots |
+| `rp_trainer_stats_daily` | Trainer P/L snapshots |
+| `rp_horse_trainer_history` | Trainer change history |
+| `rp_horse_owner_history` | Owner change history |
+| `rp_horse_medical` | Medical/wind surgery records |
+| `rp_betfair_price` | BSP prices linked to runs |
+| `rp_betfair_mapping` | Racing Post ↔ Betfair ID mappings |
+
+## Documentation Formatting
+
+When creating or editing markdown files (README.md, docs, etc.), follow the standards in:
+📄 **[docs-formatting-instructions.md](docs-formatting-instructions.md)**
+
+Key rules:
+- H2 sections: emoji + title + `---` separator
+- H3 sections: no emoji (clean hierarchy)
+- Use tables for structured data
+- Use `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` alerts
+- Professional emoji usage only (see approved list in guide)
+
 ## Project Overview
 
 rpscrape is a Python web scraper that gathers historical horse racing data from Racing Post. It requires Python 3.13+ and uses browser impersonation via curl_cffi to access the site.

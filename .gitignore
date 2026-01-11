@@ -1,6 +1,7 @@
 data/
 racecards/
 .cache/
+error_logs/
 
 .env
 

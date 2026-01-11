@@ -1,8 +1,12 @@
+import logging
+
 from collections.abc import Sequence
 from curl_cffi import Session, Response, BrowserTypeLiteral
 from random import choice
 from time import sleep
 from urllib.parse import quote
+
+logger = logging.getLogger(__name__)
 
 
 class Persistent406Error(Exception):
@@ -66,6 +70,8 @@ class NetworkClient:
                 return response.status_code, response
 
             if attempt < retries:
+                logger.warning(f'406 error (attempt {attempt}/{retries}): {url}')
                 sleep(delay)
 
+        logger.error(f'Persistent 406 after {retries} attempts: {url}')
         raise Persistent406Error(f'received 406 for {retries} attempts on {url}')

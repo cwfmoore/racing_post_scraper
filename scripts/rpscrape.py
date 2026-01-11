@@ -12,12 +12,15 @@ from orjson import loads
 from pathlib import Path
 from typing import TextIO, TYPE_CHECKING
 
+from logging_config import setup_logging, get_logger
 from utils.argparser import ArgParser
 from utils.betfair import Betfair
 from utils.network import NetworkClient
 from utils.paths import Paths, build_paths
 from utils.settings import Settings
 from utils.update import Update
+
+logger = get_logger(__name__)
 
 _ = load_dotenv()
 
@@ -38,7 +41,8 @@ def check_for_update() -> bool:
     try:
         if not update.available():
             return False
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Update check failed: {e}")
         return False
 
     try:
@@ -76,7 +80,7 @@ def get_race_urls(
             status, response = client.get(race_list_url)
 
             if status != 200:
-                print(f'Failed to get race urls.\nStatus: {status}, URL: {race_list_url}')
+                logger.error(f'Failed to get race urls. Status: {status}, URL: {race_list_url}')
                 sys.exit(1)
 
             data = loads(response.text).get('data', {})
@@ -136,10 +140,10 @@ def prepare_betfair(
 
     from utils.betfair import Betfair
 
-    print('Getting Betfair data...')
+    logger.info('Getting Betfair data...')
 
     if paths.betfair.exists():
-        print('Using cached Betfair data')
+        logger.info('Using cached Betfair data')
         return Betfair.from_csv(paths.betfair)
 
     betfair = Betfair(race_urls)
@@ -175,11 +179,11 @@ def scrape_races(
     if last_url:
         try:
             race_urls = race_urls[race_urls.index(last_url) + 1 :]
-            print(f'Resuming after {last_url}')
+            logger.info(f'Resuming after {last_url}')
         except ValueError:
-            pass
+            logger.warning(f'Progress URL not found in race list: {last_url}')
     else:
-        print('Scraping races')
+        logger.info('Scraping races')
 
     append = last_url is not None and paths.output.exists()
 
@@ -209,8 +213,8 @@ def scrape_races(
 
             _ = paths.progress.write_text(url)
 
-    print('Finished scraping.')
-    print(f'OUTPUT_CSV={paths.output.resolve()}')
+    logger.info('Finished scraping.')
+    logger.info(f'OUTPUT_CSV={paths.output.resolve()}')
 
 
 def writer_csv(file_path: str, append: bool = False) -> TextIO:
@@ -223,8 +227,11 @@ def writer_gzip(file_path: str, append: bool = False) -> TextIO:
 
 
 def main():
+    setup_logging()
+
     if settings.toml is None:
-        sys.exit()
+        logger.error('Failed to load settings')
+        sys.exit(1)
 
     if settings.toml['auto_update']:
         _ = check_for_update()
