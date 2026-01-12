@@ -1,5 +1,5 @@
 import logging
-import sys
+from time import sleep
 
 from datetime import datetime
 from jarowinkler import jarowinkler_similarity
@@ -13,6 +13,16 @@ from utils.pedigree import Pedigree
 
 from utils.cleaning import clean_race, clean_string, strip_row
 from utils.date import convert_date
+from utils.exceptions import (
+    RaceFetchError,
+    RETRY_BASE_DELAY,
+    RETRY_MAX_DELAY,
+    RETRY_MAX_HOURS,
+    calculate_backoff,
+    get_retry_deadline,
+    should_continue_retry,
+    time_remaining,
+)
 from utils.going import get_surface
 from utils.lps import get_lps_scale
 from utils.lxml_funcs import find
@@ -49,12 +59,51 @@ class Race:
 
         date_time_info = self.doc.find('.//main[@data-analytics-race-date-time]')
 
-        while date_time_info is None:
-            _, response = client.get(self.url)
-            doc = html.fromstring(response.content)
+        # Time-based retry with exponential backoff (up to 23 hours)
+        # Note: HTTP errors are already retried by the network layer.
+        # This loop handles the case where the page content isn't ready.
+        if date_time_info is None:
+            deadline = get_retry_deadline(RETRY_MAX_HOURS)
+            attempt = 0
 
-            date_time_info = doc.find('.//main[@data-analytics-race-date-time]')
-            self.doc = doc
+            while should_continue_retry(deadline):
+                status, response = client.get(self.url)
+
+                if status != 200:
+                    remaining = time_remaining(deadline)
+                    logger.warning(
+                        f'Race fetch attempt {attempt + 1} failed with status {status} '
+                        f'({remaining.total_seconds() / 3600:.1f}h remaining): {self.url}'
+                    )
+                    if remaining.total_seconds() > 0:
+                        delay = calculate_backoff(attempt, RETRY_BASE_DELAY, RETRY_MAX_DELAY)
+                        delay = min(delay, remaining.total_seconds())
+                        sleep(delay)
+                        attempt += 1
+                    continue
+
+                doc = html.fromstring(response.content)
+                date_time_info = doc.find('.//main[@data-analytics-race-date-time]')
+                self.doc = doc
+
+                if date_time_info is not None:
+                    break
+
+                remaining = time_remaining(deadline)
+                logger.warning(
+                    f'Race data not ready, attempt {attempt + 1} '
+                    f'({remaining.total_seconds() / 3600:.1f}h remaining): {self.url}'
+                )
+                if remaining.total_seconds() > 0:
+                    delay = calculate_backoff(attempt, RETRY_BASE_DELAY, RETRY_MAX_DELAY)
+                    delay = min(delay, remaining.total_seconds())
+                    sleep(delay)
+                    attempt += 1
+
+            if date_time_info is None:
+                raise RaceFetchError(
+                    f'Failed to fetch race data after {RETRY_MAX_HOURS}h: {self.url}'
+                )
 
         self.race_info.course = date_time_info.attrib['data-analytics-coursename']
 
@@ -399,9 +448,8 @@ class Race:
 
         try:
             dist_f = distance_to_furlongs(dist)
-        except ValueError:
-            logger.error(f'distance_to_furlongs() failed for race: {self.url}')
-            sys.exit(1)
+        except ValueError as e:
+            raise RaceFetchError(f'distance_to_furlongs() failed for race {self.url}: {e}')
 
         dist_m = distance_to_metres(dist_y)
 

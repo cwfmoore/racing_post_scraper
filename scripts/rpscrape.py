@@ -15,6 +15,7 @@ from typing import TextIO, TYPE_CHECKING
 from logging_config import setup_logging, get_logger
 from utils.argparser import ArgParser
 from utils.betfair import Betfair
+from utils.exceptions import RaceFetchError, NetworkError
 from utils.network import NetworkClient
 from utils.paths import Paths, build_paths
 from utils.settings import Settings
@@ -107,7 +108,12 @@ def get_race_urls_date(
     for race_date in dates:
         url = f'https://www.racingpost.com/results/{race_date}'
 
-        _, response = client.get(url)
+        status, response = client.get(url)
+
+        if status != 200:
+            logger.warning(f'Failed to get race URLs for {race_date}: status {status}')
+            continue
+
         doc = html.fromstring(response.content)
 
         races = doc.xpath('//a[@data-test-selector="link-listCourseNameLink"]')
@@ -192,7 +198,12 @@ def scrape_races(
             _ = f.write(settings.csv_header + '\n')
 
         for url in race_urls:
-            _, response = client.get(url)
+            status, response = client.get(url)
+
+            if status != 200:
+                logger.warning(f'Failed to fetch race {url}: status {status}')
+                continue
+
             doc = html.fromstring(response.content)
 
             try:
@@ -202,6 +213,12 @@ def scrape_races(
                     else Race(client, url, doc, race_type, settings.fields)
                 )
             except VoidRaceError:
+                continue
+            except RaceFetchError as e:
+                logger.warning(f'Skipping race due to fetch error: {e}')
+                continue
+            except NetworkError as e:
+                logger.warning(f'Skipping race due to network error: {e}')
                 continue
 
             allowed = RACE_TYPES.get(race_type)

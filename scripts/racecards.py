@@ -16,6 +16,7 @@ from tqdm import tqdm
 from typing import Any
 
 from logging_config import setup_logging, get_logger
+from models.racecard import Racecard, Runner
 from utils.cleaning import clean_string
 from utils.course import valid_meeting
 from utils.going import get_surface
@@ -24,8 +25,6 @@ from utils.network import NetworkClient
 from utils.profiles import get_profiles
 from utils.region import get_region, valid_region
 from utils.stats import Stats
-
-from models.racecard import Racecard, Runner
 
 logger = get_logger(__name__)
 
@@ -182,12 +181,12 @@ def parse_runners(
     for runner_json in runners_json:
         profile = None
         if data_opts.get('fetch_profiles', True):
-            try:
-                profile = profiles[runner_json['horseUid']]
-            except KeyError:
-                logger.error(f'Failed to find profile: {runner_json["horseUid"]} - {runner_json["horseName"]}')
-                logger.error(dumps(runner_json).decode('utf-8'))
-                sys.exit(1)
+            profile = profiles.get(runner_json['horseUid'])
+            if profile is None:
+                logger.warning(
+                    f'Profile unavailable for horse {runner_json["horseUid"]} - '
+                    f'{runner_json["horseName"]}, continuing without profile data'
+                )
 
         runner = Runner()
         runners.append(runner)
@@ -391,11 +390,14 @@ def scrape_racecards(
         url_racecard = f'{url_base}{href}'
         url_runners = f'{url_base}/profile/horse/data/cardrunners/{race_id}.json'
 
+        # Network layer handles 23-hour retry with exponential backoff
         status_racecard, resp_racecard = client.get(url_racecard)
         status_runners, resp_runners = client.get(url_runners)
 
         if status_racecard != 200 or status_runners != 200:
-            logger.warning(f'Failed to get racecard data. racecard: {status_racecard}, runners: {status_runners}')
+            logger.warning(
+                f'Failed to get racecard data (racecard: {status_racecard}, runners: {status_runners})'
+            )
             logger.warning(f'URLs: {url_racecard}, {url_runners}')
             continue
 

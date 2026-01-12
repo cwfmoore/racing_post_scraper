@@ -2,14 +2,30 @@ import logging
 
 from collections.abc import Sequence
 from curl_cffi import Session, Response, BrowserTypeLiteral
+from curl_cffi.requests.exceptions import RequestsError
+from datetime import datetime
 from random import choice
 from time import sleep
 from urllib.parse import quote
+
+from utils.exceptions import (
+    NetworkError,
+    RETRYABLE_STATUS_CODES,
+    RETRY_BASE_DELAY,
+    RETRY_MAX_DELAY,
+    RETRY_MAX_HOURS,
+    calculate_backoff,
+    get_retry_deadline,
+    should_continue_retry,
+    time_remaining,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class Persistent406Error(Exception):
+    """Kept for backwards compatibility."""
+
     pass
 
 
@@ -56,22 +72,100 @@ class NetworkClient:
         self,
         url: str,
         allow_redirects: bool = True,
-        retries: int = 7,
-        delay: float = 1.4,
+        max_hours: float = RETRY_MAX_HOURS,
+        base_delay: float = RETRY_BASE_DELAY,
+        max_delay: float = RETRY_MAX_DELAY,
     ) -> tuple[int, Response]:
-        for attempt in range(1, retries):
-            response = self.session.get(
-                url,
-                allow_redirects=allow_redirects,
-                timeout=self.timeout,
+        """
+        Make a GET request with time-based exponential backoff retry.
+
+        Retries for up to max_hours (default 23 hours) with exponential backoff
+        starting at base_delay (default 2s) up to max_delay (default 30 minutes).
+
+        Args:
+            url: The URL to fetch
+            allow_redirects: Whether to follow redirects
+            max_hours: Maximum hours to keep retrying (default 23)
+            base_delay: Base delay for exponential backoff (default 2s)
+            max_delay: Maximum delay between retries (default 30 minutes)
+
+        Returns:
+            Tuple of (status_code, response)
+
+        Raises:
+            NetworkError: On connection/timeout errors after retry period
+            Persistent406Error: On persistent 406 errors (backwards compatibility)
+        """
+        deadline = get_retry_deadline(max_hours)
+        last_error: Exception | None = None
+        last_status: int | None = None
+        attempt = 0
+
+        while should_continue_retry(deadline):
+            try:
+                response = self.session.get(
+                    url,
+                    allow_redirects=allow_redirects,
+                    timeout=self.timeout,
+                )
+
+                # Success - return immediately
+                if response.status_code not in RETRYABLE_STATUS_CODES:
+                    return response.status_code, response
+
+                last_status = response.status_code
+
+                # Retryable status - log and retry with backoff
+                remaining = time_remaining(deadline)
+                if remaining.total_seconds() > 0:
+                    delay = calculate_backoff(attempt, base_delay, max_delay)
+                    # Don't wait longer than remaining time
+                    delay = min(delay, remaining.total_seconds())
+
+                    logger.warning(
+                        f'{response.status_code} error (attempt {attempt + 1}, '
+                        f'{remaining.total_seconds() / 3600:.1f}h remaining): '
+                        f'{url}, retrying in {delay:.0f}s'
+                    )
+                    sleep(delay)
+                    attempt += 1
+
+            except RequestsError as e:
+                # Connection error, timeout, etc.
+                last_error = e
+                remaining = time_remaining(deadline)
+                if remaining.total_seconds() > 0:
+                    delay = calculate_backoff(attempt, base_delay, max_delay)
+                    delay = min(delay, remaining.total_seconds())
+
+                    logger.warning(
+                        f'Network error (attempt {attempt + 1}, '
+                        f'{remaining.total_seconds() / 3600:.1f}h remaining): {e}, '
+                        f'retrying in {delay:.0f}s'
+                    )
+                    sleep(delay)
+                    attempt += 1
+
+        # Retry period exhausted
+        elapsed_hours = max_hours - (time_remaining(deadline).total_seconds() / 3600)
+
+        if last_error:
+            logger.error(
+                f'Network error after {elapsed_hours:.1f}h ({attempt} attempts): {url} - {last_error}'
+            )
+            raise NetworkError(
+                f'Network error after {elapsed_hours:.1f}h on {url}: {last_error}'
             )
 
-            if response.status_code != 406:
-                return response.status_code, response
+        if last_status == 406:
+            # Backwards compatibility
+            logger.error(f'Persistent 406 after {elapsed_hours:.1f}h ({attempt} attempts): {url}')
+            raise Persistent406Error(
+                f'received 406 for {elapsed_hours:.1f}h on {url}'
+            )
 
-            if attempt < retries:
-                logger.warning(f'406 error (attempt {attempt}/{retries}): {url}')
-                sleep(delay)
-
-        logger.error(f'Persistent 406 after {retries} attempts: {url}')
-        raise Persistent406Error(f'received 406 for {retries} attempts on {url}')
+        # Return last response even if it was a retryable status
+        logger.error(
+            f'Persistent {last_status} after {elapsed_hours:.1f}h ({attempt} attempts): {url}'
+        )
+        return last_status, response
