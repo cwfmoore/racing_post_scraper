@@ -13,3 +13,11 @@ __*/
 settings/user_settings.toml
 settings/user_racecard_settings.toml
 
+# Logs (keep structure via .gitkeep, ignore contents)
+logs/deploy/*.txt
+logs/cron/*.txt
+logs/error/*.txt
+
+# Claude Code temp files
+tmpclaude-*
+

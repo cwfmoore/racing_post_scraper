@@ -276,12 +276,40 @@ case "$JOB" in
         exit $?
         ;;
 
-    help|*)
+    all)
+        # Run both jobs: racecards (today) + results (yesterday)
+        log "═══════════════════════════════════════════════════════════"
+        log "DAILY SCRAPE: Running racecards + results"
+        log "═══════════════════════════════════════════════════════════"
+
+        RC_EXIT=0
+        RES_EXIT=0
+
+        run_racecards || RC_EXIT=$?
+        echo ""
+        run_results || RES_EXIT=$?
+
+        log ""
+        log "═══════════════════════════════════════════════════════════"
+        if [ $RC_EXIT -eq 0 ] && [ $RES_EXIT -eq 0 ]; then
+            log_success "DAILY SCRAPE COMPLETE"
+            exit 0
+        else
+            log_error "DAILY SCRAPE COMPLETED WITH ERRORS"
+            [ $RC_EXIT -ne 0 ] && log_error "  Racecards job failed"
+            [ $RES_EXIT -ne 0 ] && log_error "  Results job failed"
+            exit 1
+        fi
+        ;;
+
+    help)
         echo "Racing Post Scraper"
         echo ""
         echo "Usage:"
-        echo "  docker run rpscrape racecards           # Scrape today's racecards"
-        echo "  docker run rpscrape results             # Scrape yesterday's results"
+        echo "  docker run rpscrape                     # Run both jobs (default)"
+        echo "  docker run rpscrape all                 # Run both jobs"
+        echo "  docker run rpscrape racecards           # Scrape today's racecards only"
+        echo "  docker run rpscrape results             # Scrape yesterday's results only"
         echo "  docker run rpscrape results 2026/01/05  # Scrape specific date"
         echo ""
         echo "Environment:"
@@ -293,5 +321,10 @@ case "$JOB" in
         echo "  - Initial backoff: ${INITIAL_BACKOFF_SECS}s (1 min)"
         echo "  - Max backoff: ${MAX_BACKOFF_SECS}s (30 min)"
         echo "  - Exponential backoff between retries"
+        ;;
+
+    *)
+        # Default: run both jobs
+        exec "$0" all
         ;;
 esac

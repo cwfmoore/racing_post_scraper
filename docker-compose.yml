@@ -1,14 +1,15 @@
 # Racing Post Scraper
 #
-# This container is triggered by host cron, not run continuously.
+# Triggered by deploy.sh via cron (not run continuously)
 #
 # Usage:
-#   docker compose run --rm scraper am    # AM job
-#   docker compose run --rm scraper pm    # PM job
+#   ./deploy.sh                              # Full deploy: git pull, build, run
+#   docker compose run --rm scraper          # Run both jobs (racecards + results)
+#   docker compose run --rm scraper racecards # Racecards only
+#   docker compose run --rm scraper results   # Results only
 #
 # Crontab (on NAS host):
-#   0 6 * * *  cd /path/to/racing_post_scraper && docker compose run --rm scraper am >> logs/cron.log 2>&1
-#   0 22 * * * cd /path/to/racing_post_scraper && docker compose run --rm scraper pm >> logs/cron.log 2>&1
+#   0 6 * * * /path/to/racing_post_scraper/deploy.sh
 
 services:
   scraper:
@@ -19,6 +20,7 @@ services:
       # API endpoint (nas_api_003 Django server)
       - API_URL=${API_URL:-http://host.docker.internal:8000/api/racing-post}
       - REGIONS=${REGIONS:-gb,ire}
+      - TZ=UTC
 
       # Racing Post credentials
       - EMAIL=${EMAIL}
@@ -30,7 +32,23 @@ services:
       - "host.docker.internal:host-gateway"
 
     volumes:
-      # Logs
+      # Logs (standardised structure)
       - ./logs:/app/logs
       # Error logs (persistent for debugging)
       - ./error_logs:/app/error_logs
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+    # Healthcheck
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "docker-entrypoint"]
+      interval: 60s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
