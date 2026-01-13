@@ -1,6 +1,6 @@
 #!/bin/bash
 # deploy.sh - NAS deployment script for Racing Post scraper
-# Cron: 0 6 * * * /path/to/racing_post_scraper/deploy.sh
+# Cron: 0 6 * * * /path/to/racing_post_scraper/deploy.sh >> /path/to/racing_post_scraper/logs/cron/$(date +\%Y-\%m-\%d)_cron.txt 2>&1
 #
 # Flow: git pull → docker build → run (racecards + results) → exit
 

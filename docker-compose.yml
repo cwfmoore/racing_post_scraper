@@ -9,7 +9,7 @@
 #   docker compose run --rm scraper results   # Results only
 #
 # Crontab (on NAS host):
-#   0 6 * * * /path/to/racing_post_scraper/deploy.sh
+#   0 6 * * * /path/to/racing_post_scraper/deploy.sh >> /path/to/racing_post_scraper/logs/cron/$(date +\%Y-\%m-\%d)_cron.txt 2>&1
 
 services:
   scraper:
