@@ -2,8 +2,17 @@ import logging
 
 from collections.abc import Sequence
 from curl_cffi import Session, Response, BrowserTypeLiteral
-from curl_cffi.requests.exceptions import RequestsError
 from datetime import datetime
+
+# Handle different curl_cffi versions - exception class name varies
+try:
+    from curl_cffi.requests.exceptions import RequestsError
+except ImportError:
+    try:
+        from curl_cffi import CurlError as RequestsError
+    except ImportError:
+        # Fallback to base Exception if neither exists
+        RequestsError = Exception
 from random import choice
 from time import sleep
 from urllib.parse import quote
