@@ -32,7 +32,7 @@ LOG_FILE="logs/deploy/$(date +%Y-%m-%d)_deploy_log.txt"
 
     # Pull latest code
     echo "[1/3] Pulling latest code..."
-    git pull origin main
+    git pull origin master
 
     # Build container (quiet mode to avoid log spam)
     echo "[2/3] Building Docker image..."
