@@ -13,7 +13,7 @@
 
 set -o pipefail  # Catch errors in pipes
 
-JOB="${1:-help}"
+JOB="${1:-all}"
 API_URL="${API_URL:-http://host.docker.internal:8000/api/racing-post}"
 REGIONS="${REGIONS:-gb,ire}"
 
@@ -324,7 +324,8 @@ case "$JOB" in
         ;;
 
     *)
-        # Default: run both jobs
-        exec "$0" all
+        # Unknown argument - show help
+        echo "Unknown command: $JOB"
+        exec "$0" help
         ;;
 esac
