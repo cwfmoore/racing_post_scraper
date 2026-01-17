@@ -10,8 +10,6 @@ error_logs/
 __*/
 
 .DS_Store
-settings/user_settings.toml
-settings/user_racecard_settings.toml
 
 # Logs (keep structure via .gitkeep, ignore contents)
 logs/deploy/*.txt

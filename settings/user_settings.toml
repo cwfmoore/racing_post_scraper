@@ -1,0 +1,97 @@
+# User settings - Betfair data + all IDs enabled
+
+auto_update = false
+gzip_output = false
+
+betfair_data = true  # ENABLED - Get Betfair BSP, WAP, volumes
+
+[fields]
+
+[fields.race_info]
+date = true
+region = true
+course_id = true   # ENABLED
+course = true
+course_detail = true
+
+race_id = true     # ENABLED
+off = true
+race_name = true
+
+type = true
+class = true
+pattern = true
+
+rating_band = true
+age_band = true
+sex_rest = true
+
+dist = true
+dist_f = true
+dist_m = true
+dist_y = true      # ENABLED
+
+going = true
+surface = true
+
+ran = true
+
+[fields.runner_info]
+num = true
+pos = true
+draw = true
+
+ovr_btn = true
+btn = true
+
+horse_id = true    # ENABLED
+horse = true
+age = true
+sex = true
+
+wgt = true         # ENABLED
+lbs = true
+
+hg = true
+
+time = true
+secs = true
+
+sp = true          # ENABLED - fractional odds
+dec = true
+
+jockey_id = true   # ENABLED
+jockey = true
+trainer_id = true  # ENABLED
+trainer = true
+
+prize = true
+
+or = true
+rpr = true
+ts = true          # ENABLED - Top Speed rating
+
+sire_id = true     # ENABLED
+sire = true
+dam_id = true      # ENABLED
+dam = true
+damsire_id = true  # ENABLED
+damsire = true
+
+owner_id = true    # ENABLED
+owner = true
+silk_url = true    # ENABLED
+
+comment = true
+
+[fields.betfair]
+bsp = true
+wap = true
+morning_wap = true
+pre_min = true
+pre_max = true
+ip_min = true
+ip_max = true
+morning_vol = true
+pre_vol = true
+ip_vol = true

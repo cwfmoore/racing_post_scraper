@@ -1,0 +1,24 @@
+# User racecard settings - stats enabled
+
+[data_collection]
+fetch_stats = true
+fetch_profiles = true
+
+[field_groups]
+core = true
+basic_info = true
+performance = true
+jockey = true
+trainer = true
+weight = true
+equipment = true
+breeding = true
+ownership = true
+comments = true
+status = true
+silk = true
+profile = true
+stats = true
+history = true
+medical = true
+quotes = true
