@@ -20,11 +20,23 @@ Generate a **post-racing data validation report** to verify results and BSP data
 ## When to Run
 
 Run this report **after racing has finished** (typically after 9pm UK time).
-The report validates that:
-- Yesterday's race results were scraped
-- Run data is complete (matches expected runners)
-- BSP prices were captured
+
+### 📅 Data Collection Timeline
+| When | What's Collected | Checked In This Report |
+|------|------------------|------------------------|
+| 6am TODAY | Today's racecard + stats | ✅ Today's racecard |
+| 6am TODAY | Yesterday's results + BSP | ✅ Yesterday's results |
+| 6am TOMORROW | Today's results + BSP | ❌ Not yet available |
+
+### ✅ This Report Validates:
+- **Today's racecard** was collected (⚠️ time-sensitive - can't backfill!)
+- **Yesterday's results** are complete with BSP
+- Run data matches expected runners
 - No data quality issues
+
+### ⚠️ Important: Time-Sensitive Data
+Racecard data (C/D/G stats, jockey/trainer P/L) **cannot be backfilled**.
+If today's racecard wasn't collected, that data is **lost forever**.
 
 ## Your Tools
 
@@ -43,14 +55,26 @@ ct.get_report_summary()  # All-in-one comprehensive report
 ```
 This returns everything. Use individual functions below for drilling into issues.
 
-### 2. Date Coverage
+### 2. Today's Racecard (⚠️ TIME-SENSITIVE)
+```python
+ct.get_races_by_date(ct.today())      # Today's races
+ct.get_stats_coverage(days=1)          # Racecard/stats for today
+```
+Check:
+- Racecard entries exist for today
+- Horse race stats (C/D/G) captured
+- Jockey/trainer stats captured
+
+**🚨 If missing:** Cannot backfill - flag as CRITICAL
+
+### 3. Date Coverage
 ```python
 ct.get_date_coverage(days=7)     # Recent date coverage
 ct.get_date_range()               # Overall data range
 ```
 Report: Coverage by date, days with missing data
 
-### 3. Yesterday's Results
+### 4. Yesterday's Results
 ```python
 ct.get_races_by_date(ct.yesterday())  # All yesterday's races
 ct.find_missing_runs()                 # Races without run data
@@ -58,19 +82,19 @@ ct.find_incomplete_races()             # Runner count mismatches
 ```
 Report: Races, run completeness, missing races
 
-### 4. BSP Coverage
+### 5. BSP Coverage
 ```python
 ct.get_bsp_coverage(days=7)  # Betfair BSP data coverage
 ```
 Report: BSP coverage %, missing BSP data
 
-### 5. Data Quality
+### 6. Data Quality
 ```python
 ct.check_data_quality()  # Comprehensive quality checks
 ```
 Report: Orphans, null values, mismatches
 
-### 6. Historical Comparison
+### 7. Historical Comparison
 ```python
 ct.get_data_summary()  # Table row counts
 ct.get_course_summary()  # Data by course
@@ -105,7 +129,21 @@ Generated: {timestamp}
 
 ---
 
-### 📅 2. Date Coverage (Last 7 Days)
+### 🎫 2. Today's Racecard ({today's date}) - ⚠️ TIME-SENSITIVE
+
+| Metric | Value | Status |
+|--------|-------|--------|
+| Races Scheduled | X | - |
+| Racecard Entries | X | ✅/❌ |
+| Horse Race Stats | X | ✅/❌ |
+| Jockey Stats | X | ✅/❌ |
+| Trainer Stats | X | ✅/❌ |
+
+**🚨 If any are 0:** Data collection failed this morning - CANNOT backfill!
+
+---
+
+### 📅 3. Date Coverage (Last 7 Days)
 | Date | Races | With Runs | Without Runs | Racecard | Stats |
 |------|-------|-----------|--------------|----------|-------|
 | ... | X | X | X | X | X |
@@ -114,7 +152,7 @@ Generated: {timestamp}
 
 ---
 
-### 🏇 3. Yesterday's Results ({date})
+### 🏇 4. Yesterday's Results ({yesterday's date})
 | Metric | Value |
 |--------|-------|
 | Total Races | X |
@@ -129,7 +167,7 @@ Generated: {timestamp}
 
 ---
 
-### 💰 4. BSP Coverage (Last 7 Days)
+### 💰 5. BSP Coverage (Last 7 Days)
 
 ⚠️ **IMPORTANT:** Always show daily breakdown - overall % can hide collection failures.
 
@@ -148,7 +186,7 @@ Generated: {timestamp}
 
 ---
 
-### ⚠️ 5. Data Quality
+### ⚠️ 6. Data Quality
 | Check | Count | Status |
 |-------|-------|--------|
 | Orphaned Runs | X | ✅/⚠️ |
@@ -160,14 +198,14 @@ Generated: {timestamp}
 
 ---
 
-### 📈 6. Course Summary (Top 10)
+### 📈 7. Course Summary (Top 10)
 | Course | Races | Runs | First Race | Last Race |
 |--------|-------|------|------------|-----------|
 | ... | X | X | YYYY-MM-DD | YYYY-MM-DD |
 
 ---
 
-### 📊 7. Historical Stats
+### 📊 8. Historical Stats
 | Metric | Value |
 |--------|-------|
 | Earliest Date | YYYY-MM-DD |
@@ -189,6 +227,8 @@ Generated: {timestamp}
 
 | Check | ✅ PASS | ⚠️ WARNING | ❌ FAIL |
 |-------|---------|------------|---------|
+| **Today's Racecard** | Entries > 0 | - | **0 entries (CRITICAL)** |
+| **Today's Stats** | Stats > 0 | - | **0 stats (CRITICAL)** |
 | Yesterday's Coverage | 100% with runs | 95-99% | <95% |
 | BSP Coverage (daily) | ≥90% each day | 80-90% | <80% |
 | BSP Collection | All days have data | - | **Any day at 0%** |
@@ -203,6 +243,8 @@ Flag these issues prominently:
 
 | Condition | Level | Message |
 |-----------|-------|---------|
+| `today_racecard == 0` | ❌ CRITICAL | Today's racecard missing - DATA LOST FOREVER |
+| `today_stats == 0` | ❌ CRITICAL | Today's stats missing - DATA LOST FOREVER |
 | `days_behind > 2` | ❌ CRITICAL | Data collection falling behind |
 | `any_day_bsp == 0%` | ❌ CRITICAL | BSP collection stopped - check settings/scheduler |
 | `yesterday_coverage < 95%` | ⚠️ WARNING | Missing race results |
@@ -214,10 +256,12 @@ Flag these issues prominently:
 ## Rules
 
 1. **Run get_report_summary() first** - it has everything
-2. **Focus on YESTERDAY's results** - this is what should have been scraped
-3. **Flag missing races prominently** - may need manual re-scrape
-4. **Include specific details** - race IDs, course names for follow-up
-5. **Compare to baseline** - today vs average matters
+2. **Check TODAY's racecard FIRST** - time-sensitive, cannot backfill!
+3. **Check YESTERDAY's results** - collected this morning, should be complete
+4. **Flag missing racecard as CRITICAL** - data is lost forever
+5. **Flag missing results as WARNING** - can be re-scraped
+6. **Include specific details** - race IDs, course names for follow-up
+7. **Compare to baseline** - today vs average matters
 
 ## Quick Commands
 
@@ -226,13 +270,19 @@ For full end-of-day validation:
 ct.get_report_summary()  # Returns everything in one call
 ```
 
-For drilling into specific issues:
+For checking today's racecard (⚠️ TIME-SENSITIVE):
 ```python
-ct.get_races_by_date(ct.yesterday())  # Yesterday's races
-ct.find_missing_runs()                 # Races without run data
-ct.find_incomplete_races()             # Runner count mismatches
-ct.get_bsp_coverage(days=7)            # BSP coverage
-ct.get_race_details(race_id)           # Specific race deep dive
+ct.get_races_by_date(ct.today())       # Today's races
+ct.get_stats_coverage(days=1)           # Racecard/stats coverage
+```
+
+For checking yesterday's results:
+```python
+ct.get_races_by_date(ct.yesterday())   # Yesterday's races
+ct.find_missing_runs()                  # Races without run data
+ct.find_incomplete_races()              # Runner count mismatches
+ct.get_bsp_coverage(days=7)             # BSP coverage
+ct.get_race_details(race_id)            # Specific race deep dive
 ```
 
 For historical comparison:
