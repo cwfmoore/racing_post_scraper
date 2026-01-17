@@ -1,0 +1,315 @@
+# End of Day Report Prompt
+
+Generate a **post-racing data validation report** to verify results and BSP data have been captured.
+
+## ⚠️ Output Format Requirements
+
+**Format: Markdown (.md)**
+- Output the report in proper GitHub-flavored markdown
+- Use headers, tables, code blocks, and lists for structure
+- ⚠️ **DO NOT** start with `---` (YAML front matter) - start directly with the `#` header
+
+**Style: ADHD-Friendly**
+- 🎯 Use emojis liberally for visual markers and quick scanning
+- 📊 Use tables instead of paragraphs for data
+- ✅❌⚠️ Use status emojis prominently (checkmarks, X marks, warnings)
+- 🔢 Keep bullet points short (1-2 lines max)
+- 🎨 Use **bold** and `code` formatting to break up text
+- 🚫 Avoid walls of text - if it's more than 3 sentences, break it up
+
+## When to Run
+
+Run this report **after racing has finished** (typically after 9pm UK time).
+The report validates that:
+- Yesterday's race results were scraped
+- Run data is complete (matches expected runners)
+- BSP prices were captured
+- No data quality issues
+
+## Your Tools
+
+Use the `claude_tools.py` module:
+
+```python
+from claude_tools import ClaudeTools
+ct = ClaudeTools()
+```
+
+## Required Checks (in order)
+
+### 1. Quick Summary (Start Here)
+```python
+ct.get_report_summary()  # All-in-one comprehensive report
+```
+This returns everything. Use individual functions below for drilling into issues.
+
+### 2. Date Coverage
+```python
+ct.get_date_coverage(days=7)     # Recent date coverage
+ct.get_date_range()               # Overall data range
+```
+Report: Coverage by date, days with missing data
+
+### 3. Yesterday's Results
+```python
+ct.get_races_by_date(ct.yesterday())  # All yesterday's races
+ct.find_missing_runs()                 # Races without run data
+ct.find_incomplete_races()             # Runner count mismatches
+```
+Report: Races, run completeness, missing races
+
+### 4. BSP Coverage
+```python
+ct.get_bsp_coverage(days=7)  # Betfair BSP data coverage
+```
+Report: BSP coverage %, missing BSP data
+
+### 5. Data Quality
+```python
+ct.check_data_quality()  # Comprehensive quality checks
+```
+Report: Orphans, null values, mismatches
+
+### 6. Historical Comparison
+```python
+ct.get_data_summary()  # Table row counts
+ct.get_course_summary()  # Data by course
+```
+Report: Total records, growth over time
+
+## Output Format
+
+**Output as Markdown (.md)** - the report will be saved as a .md file.
+
+Use this exact structure:
+
+```
+## Racing Post End of Day Report - {date}
+Generated: {timestamp}
+
+### 🎯 Overall Status: {✅ PASS / ⚠️ ISSUES FOUND}
+
+### Issues Found
+{Bulleted list of problems, or "✅ None - all checks passed"}
+
+---
+
+### 📊 1. Data Summary
+| Table | Records |
+|-------|---------|
+| rp_race | X |
+| rp_run | X |
+| rp_racecard_entry | X |
+| rp_horse_race_stats | X |
+| rp_betfair_price | X |
+
+---
+
+### 📅 2. Date Coverage (Last 7 Days)
+| Date | Races | With Runs | Without Runs | Racecard | Stats |
+|------|-------|-----------|--------------|----------|-------|
+| ... | X | X | X | X | X |
+
+**Dates Missing Data:** {list or "None"}
+
+---
+
+### 🏇 3. Yesterday's Results ({date})
+| Metric | Value |
+|--------|-------|
+| Total Races | X |
+| With Run Data | X |
+| Coverage | X% |
+| Incomplete Races | X |
+
+**Races Without Results:**
+| Course | Race | Expected Runners |
+|--------|------|------------------|
+| ... | ... | X |
+
+---
+
+### 💰 4. BSP Coverage (Last 7 Days)
+| Date | Runs | With BSP | Coverage |
+|------|------|----------|----------|
+| ... | X | X | X% |
+
+**Overall BSP Coverage:** X%
+
+---
+
+### ⚠️ 5. Data Quality
+| Check | Count | Status |
+|-------|-------|--------|
+| Orphaned Runs | X | ✅/⚠️ |
+| Null Positions | X | ✅/⚠️ |
+| Null SP | X | ✅/⚠️ |
+| Null Jockey | X | ✅/⚠️ |
+| Null Trainer | X | ✅/⚠️ |
+| Runner Mismatches | X | ✅/⚠️ |
+
+---
+
+### 📈 6. Course Summary (Top 10)
+| Course | Races | Runs | First Race | Last Race |
+|--------|-------|------|------------|-----------|
+| ... | X | X | YYYY-MM-DD | YYYY-MM-DD |
+
+---
+
+### 📊 7. Historical Stats
+| Metric | Value |
+|--------|-------|
+| Earliest Date | YYYY-MM-DD |
+| Latest Date | YYYY-MM-DD |
+| Total Days | X |
+| Total Races | X |
+| Total Runs | X |
+
+---
+
+### 📝 Summary
+{2-3 sentence summary of data quality}
+
+### 🔔 Action Items
+{List any follow-up needed, or "None required"}
+```
+
+## Pass/Fail Criteria
+
+| Check | ✅ PASS | ⚠️ WARNING | ❌ FAIL |
+|-------|---------|------------|---------|
+| Yesterday's Coverage | 100% with runs | 95-99% | <95% |
+| BSP Coverage | ≥90% | 80-90% | <80% |
+| Incomplete Races | 0 | 1-3 | >3 |
+| Orphaned Runs | 0 | 1-10 | >10 |
+| Null Positions | <1% | 1-5% | >5% |
+| Data Staleness | ≤1 day behind | 2 days | >2 days |
+
+## Alert Conditions
+
+Flag these issues prominently:
+
+| Condition | Level | Message |
+|-----------|-------|---------|
+| `days_behind > 2` | ❌ CRITICAL | Data collection falling behind |
+| `yesterday_coverage < 95%` | ⚠️ WARNING | Missing race results |
+| `bsp_coverage < 80%` | ⚠️ WARNING | Low BSP coverage |
+| `orphaned_runs > 10` | ⚠️ WARNING | Data integrity issues |
+| `incomplete_races > 3` | ⚠️ WARNING | Runner count mismatches |
+| `null_positions > 5%` | ⚠️ WARNING | Missing result data |
+
+## Rules
+
+1. **Run get_report_summary() first** - it has everything
+2. **Focus on YESTERDAY's results** - this is what should have been scraped
+3. **Flag missing races prominently** - may need manual re-scrape
+4. **Include specific details** - race IDs, course names for follow-up
+5. **Compare to baseline** - today vs average matters
+
+## Quick Commands
+
+For full end-of-day validation:
+```python
+ct.get_report_summary()  # Returns everything in one call
+```
+
+For drilling into specific issues:
+```python
+ct.get_races_by_date(ct.yesterday())  # Yesterday's races
+ct.find_missing_runs()                 # Races without run data
+ct.find_incomplete_races()             # Runner count mismatches
+ct.get_bsp_coverage(days=7)            # BSP coverage
+ct.get_race_details(race_id)           # Specific race deep dive
+```
+
+For historical comparison:
+```python
+ct.get_date_coverage(days=14)  # Two weeks coverage
+ct.get_course_summary()        # By course
+ct.get_data_summary()          # All tables
+```
+
+## Available Functions Reference
+
+### Summary Reports
+| Function | Purpose |
+|----------|---------|
+| `ct.get_report_summary()` | **All-in-one EOD report** |
+| `ct.get_data_summary()` | Table row counts |
+| `ct.get_date_range()` | Overall data range |
+
+### Coverage Analysis
+| Function | Purpose |
+|----------|---------|
+| `ct.get_date_coverage(days)` | Coverage by date |
+| `ct.get_stats_coverage(days)` | Racecard/stats coverage |
+| `ct.get_bsp_coverage(days)` | BSP data coverage |
+| `ct.get_races_by_date(date)` | All races for a date |
+
+### Data Quality
+| Function | Purpose |
+|----------|---------|
+| `ct.check_data_quality()` | Comprehensive quality checks |
+| `ct.find_missing_runs()` | Races without run data |
+| `ct.find_incomplete_races()` | Runner count mismatches |
+
+### Lookups
+| Function | Purpose |
+|----------|---------|
+| `ct.get_race_details(race_id)` | Full race with runners |
+| `ct.get_horse_history(horse_id)` | Horse race history |
+| `ct.get_course_summary()` | Data by course |
+| `ct.search_horse(name)` | Find horse by name |
+
+### Duplicate Detection
+| Function | Purpose |
+|----------|---------|
+| `ct.find_duplicate_trainers()` | Duplicate trainer records |
+| `ct.find_duplicate_jockeys()` | Duplicate jockey records |
+| `ct.find_duplicate_owners()` | Duplicate owner records |
+| `ct.find_all_duplicates()` | All duplicates summary |
+
+### Date Helpers
+| Function | Purpose |
+|----------|---------|
+| `ct.today()` | Today's date string |
+| `ct.yesterday()` | Yesterday's date string |
+
+### Custom SQL
+| Function | Purpose |
+|----------|---------|
+| `ct.run_sql(query, params)` | Custom queries |
+| `ct.execute_sql(query, params)` | Write operations |
+| `ct.get_tables()` | List all rp_* tables |
+
+## Troubleshooting Common Issues
+
+### Missing Race Results
+```python
+missing = ct.find_missing_runs()
+for m in missing:
+    print(f"{m['date']} - {m['course']} - {m['race_name']} (race_id: {m['race_id']})")
+```
+
+### Incomplete Races
+```python
+incomplete = ct.find_incomplete_races()
+for r in incomplete:
+    print(f"{r['course']}: expected {r['expected']}, got {r['actual']} (race_id: {r['race_id']})")
+```
+
+### Low BSP Coverage
+```python
+bsp = ct.get_bsp_coverage(days=7)
+for d in bsp['by_date']:
+    if d['pct'] < 80:
+        print(f"{d['date']}: only {d['pct']}% BSP coverage")
+```
+
+### Data Quality Issues
+```python
+quality = ct.check_data_quality()
+for issue in quality['issues']:
+    print(f"⚠️ {issue}")
+```

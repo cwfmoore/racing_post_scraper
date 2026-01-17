@@ -1,0 +1,225 @@
+# Trading Day Report Prompt
+
+Generate a **racecard collection health report** to verify today's racecards and stats have been captured.
+
+## ⚠️ Output Format Requirements
+
+**Format: Markdown (.md)**
+- Output the report in proper GitHub-flavored markdown
+- Use headers, tables, code blocks, and lists for structure
+- ⚠️ **DO NOT** start with `---` (YAML front matter) - start directly with the `#` header
+
+**Style: ADHD-Friendly**
+- 🎯 Use emojis liberally for visual markers and quick scanning
+- 📊 Use tables instead of paragraphs for data
+- ✅❌⚠️ Use status emojis prominently (checkmarks, X marks, warnings)
+- 🔢 Keep bullet points short (1-2 lines max)
+- 🎨 Use **bold** and `code` formatting to break up text
+- 🚫 Avoid walls of text - if it's more than 3 sentences, break it up
+
+## Important: How This Scraper Works
+
+**The scraper collects two types of data:**
+
+| Script | Data Type | When to Run | Backfillable? |
+|--------|-----------|-------------|---------------|
+| `racecards.py` | Racecard entries + stats | Before racing | ❌ **No** |
+| `rpscrape.py` | Historical results + BSP | After racing | ✅ Yes |
+
+**Critical:** Racecard stats (jockey/trainer P/L, C/D/G) are **point-in-time snapshots**. Miss a day = data lost forever.
+
+## Your Tools
+
+Use the `claude_tools.py` module:
+
+```python
+from claude_tools import ClaudeTools
+ct = ClaudeTools()
+```
+
+## Required Checks (in order)
+
+### 1. Quick Overview (Start Here)
+```python
+ct.get_daily_report()  # All-in-one comprehensive report
+```
+This returns everything. Use individual functions below for drilling into issues.
+
+### 2. System Health
+```python
+ct.health_check()  # DB status, data freshness
+```
+Report: DB status, data staleness, overall health
+
+### 3. Today's Racecard Coverage
+```python
+ct.get_stats_coverage(days=1)  # Today's racecard/stats coverage
+ct.get_races_by_date(ct.today())  # All races today
+```
+Report: Races today, which have racecards, which have stats
+
+### 4. Stats Data Captured
+```python
+ct.get_stats_coverage(days=7)  # Recent stats coverage
+```
+Report: Jockey stats count, trainer stats count, horse race stats
+
+### 5. Data Quality
+```python
+ct.check_data_quality()  # Orphans, nulls, mismatches
+ct.find_missing_runs()   # Races without run data (past only)
+```
+Report: Data quality issues
+
+## Output Format
+
+**Output as Markdown (.md)** - the report will be saved as a .md file.
+
+Use this exact structure:
+
+```
+## Racing Post Trading Day Report - {date} {time}
+
+### 🎯 Quick Status
+| Component | Status |
+|-----------|--------|
+| Database  | ✅ OK / ❌ ERROR |
+| Data      | ✅ FRESH / ⚠️ STALE |
+| Overall   | ✅ HEALTHY / ⚠️ DEGRADED / ❌ UNHEALTHY |
+
+**Latest data:** {date} ({X} days behind)
+
+---
+
+### 📊 Today's Racecard Coverage
+| Metric | Value |
+|--------|-------|
+| Total Races Today | X |
+| With Racecard | X |
+| With Horse Stats | X |
+| Coverage % | X% |
+
+**Missing Racecards:** {count or "None"}
+
+---
+
+### 📈 Stats Collection (Last 7 Days)
+| Date | Races | Racecard | Horse Stats | Jockey Stats | Trainer Stats |
+|------|-------|----------|-------------|--------------|---------------|
+| ... | ... | X | X | X | X |
+
+---
+
+### 🏇 Today's Races
+| Time | Course | Race | Runners | Racecard? | Stats? |
+|------|--------|------|---------|-----------|--------|
+| ... | ... | ... | X | ✅/❌ | ✅/❌ |
+
+---
+
+### ⚠️ Data Quality
+| Check | Count | Status |
+|-------|-------|--------|
+| Orphaned Runs | X | ✅/⚠️ |
+| Null Positions | X | ✅/⚠️ |
+| Runner Mismatches | X | ✅/⚠️ |
+
+---
+
+### 🔔 Alerts
+{List any problems found}
+{If all OK: "✅ All systems nominal - racecards captured"}
+
+### 📝 Action Items
+{List any follow-up needed, or "None required"}
+```
+
+## Rules
+
+1. **Run get_daily_report() first** - it has everything
+2. **Focus on TODAY's racecards** - this is time-sensitive data
+3. **Flag missing stats prominently** - they cannot be backfilled
+4. **Show actual numbers** - no vague statements
+5. **Include timestamps** - when data was captured
+
+## Alert Conditions
+
+Flag these issues prominently:
+
+| Condition | Alert Level | Message |
+|-----------|-------------|---------|
+| `health.overall == "unhealthy"` | ❌ CRITICAL | Database connection issue |
+| `health.data.days_behind > 2` | ⚠️ WARNING | Data falling behind |
+| `racecard_coverage < 90%` | ⚠️ WARNING | Missing racecards today |
+| `horse_stats_coverage < 80%` | ⚠️ WARNING | Missing C/D/G stats |
+| `jockey_stats == 0` for today | ❌ CRITICAL | No jockey P/L captured |
+| `trainer_stats == 0` for today | ❌ CRITICAL | No trainer P/L captured |
+
+## Pass/Fail Criteria
+
+| Check | ✅ PASS | ❌ FAIL |
+|-------|---------|---------|
+| Database | Connected | Error |
+| Today's Racecards | ≥90% coverage | <80% coverage |
+| Horse Stats | ≥80% coverage | <60% coverage |
+| Jockey Stats | >0 records | 0 records |
+| Trainer Stats | >0 records | 0 records |
+| Data Quality | 0 issues | >5 issues |
+
+## Quick Commands
+
+For a fast status check:
+```python
+ct.get_daily_report()  # Returns everything in one call
+```
+
+For drilling into issues:
+```python
+ct.health_check()                    # System health
+ct.get_races_by_date(ct.today())     # Today's races
+ct.get_stats_coverage(days=1)        # Today's stats
+ct.get_race_details(race_id)         # Specific race deep dive
+ct.check_data_quality()              # Data quality checks
+```
+
+## Available Functions Reference
+
+### Health & Status
+| Function | Purpose |
+|----------|---------|
+| `ct.health_check()` | DB status, data freshness |
+| `ct.get_daily_report()` | **All-in-one report** |
+| `ct.get_data_summary()` | Table row counts |
+
+### Racecard & Stats Coverage
+| Function | Purpose |
+|----------|---------|
+| `ct.get_stats_coverage(days)` | Racecard/stats coverage by date |
+| `ct.get_races_by_date(date)` | All races for a date |
+| `ct.get_date_coverage(days)` | Coverage by date (races, runs) |
+
+### Data Quality
+| Function | Purpose |
+|----------|---------|
+| `ct.check_data_quality()` | Comprehensive quality checks |
+| `ct.find_missing_runs()` | Races without run data |
+| `ct.find_incomplete_races()` | Runner count mismatches |
+
+### Race Lookups
+| Function | Purpose |
+|----------|---------|
+| `ct.get_race_details(race_id)` | Full race with runners |
+| `ct.get_horse_history(horse_id)` | Horse race history |
+| `ct.search_horse(name)` | Find horse by name |
+
+### Date Helpers
+| Function | Purpose |
+|----------|---------|
+| `ct.today()` | Today's date string |
+| `ct.yesterday()` | Yesterday's date string |
+
+### Custom SQL
+| Function | Purpose |
+|----------|---------|
+| `ct.run_sql(query, params)` | Custom queries |
+| `ct.get_tables()` | List all rp_* tables |
