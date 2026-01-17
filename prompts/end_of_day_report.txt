@@ -130,11 +130,21 @@ Generated: {timestamp}
 ---
 
 ### 💰 4. BSP Coverage (Last 7 Days)
-| Date | Runs | With BSP | Coverage |
-|------|------|----------|----------|
-| ... | X | X | X% |
+
+⚠️ **IMPORTANT:** Always show daily breakdown - overall % can hide collection failures.
+
+| Date | Runs | With BSP | Coverage | Status |
+|------|------|----------|----------|--------|
+| 2026-01-16 | X | X | X% | ✅/❌ |
+| 2026-01-15 | X | X | X% | ✅/❌ |
+| ... | ... | ... | ... | ... |
 
 **Overall BSP Coverage:** X%
+
+**🚨 Collection Status Check:**
+- If any recent day shows **0% BSP** → Flag as "BSP COLLECTION STOPPED"
+- If coverage drops from 100% to 0% on a specific date → Identify when it stopped
+- This usually indicates a **settings or scheduler issue**, not a data problem
 
 ---
 
@@ -180,7 +190,8 @@ Generated: {timestamp}
 | Check | ✅ PASS | ⚠️ WARNING | ❌ FAIL |
 |-------|---------|------------|---------|
 | Yesterday's Coverage | 100% with runs | 95-99% | <95% |
-| BSP Coverage | ≥90% | 80-90% | <80% |
+| BSP Coverage (daily) | ≥90% each day | 80-90% | <80% |
+| BSP Collection | All days have data | - | **Any day at 0%** |
 | Incomplete Races | 0 | 1-3 | >3 |
 | Orphaned Runs | 0 | 1-10 | >10 |
 | Null Positions | <1% | 1-5% | >5% |
@@ -193,6 +204,7 @@ Flag these issues prominently:
 | Condition | Level | Message |
 |-----------|-------|---------|
 | `days_behind > 2` | ❌ CRITICAL | Data collection falling behind |
+| `any_day_bsp == 0%` | ❌ CRITICAL | BSP collection stopped - check settings/scheduler |
 | `yesterday_coverage < 95%` | ⚠️ WARNING | Missing race results |
 | `bsp_coverage < 80%` | ⚠️ WARNING | Low BSP coverage |
 | `orphaned_runs > 10` | ⚠️ WARNING | Data integrity issues |
