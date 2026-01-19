@@ -3,7 +3,7 @@
 auto_update = false
 gzip_output = false
 
-betfair_data = true  # ENABLED - Get Betfair BSP, WAP, volumes
+betfair_data = false  # DISABLED - Betfair returning 403
 
 [fields]
 

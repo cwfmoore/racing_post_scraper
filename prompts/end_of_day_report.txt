@@ -19,7 +19,9 @@ Generate a **post-racing data validation report** to verify results and BSP data
 
 ## When to Run
 
-Run this report **after racing has finished** (typically after 9pm UK time).
+Run this report **after 6am AND after racing has finished** (recommended: 10pm UK time).
+
+⚠️ **CRITICAL:** The daily scrape runs at **6am UTC**. Running this report before 6am will show missing data that hasn't been collected yet.
 
 ### 📅 Data Collection Timeline
 | When | What's Collected | Checked In This Report |
@@ -27,6 +29,11 @@ Run this report **after racing has finished** (typically after 9pm UK time).
 | 6am TODAY | Today's racecard + stats | ✅ Today's racecard |
 | 6am TODAY | Yesterday's results + BSP | ✅ Yesterday's results |
 | 6am TOMORROW | Today's results + BSP | ❌ Not yet available |
+
+### 🕙 What This Report Validates (at 10pm)
+- **Today's racecard** → Was collected at 6am this morning
+- **Yesterday's results** → Were collected at 6am this morning
+- **Today's results** → NOT available yet (collected tomorrow at 6am)
 
 ### ✅ This Report Validates:
 - **Today's racecard** was collected (⚠️ time-sensitive - can't backfill!)
@@ -49,13 +56,19 @@ ct = ClaudeTools()
 
 ## Required Checks (in order)
 
-### 1. Quick Summary (Start Here)
+### 1. Quick Validation (Start Here)
+```python
+ct.get_eod_validation()  # Quick pass/fail: today's racecard + yesterday's results
+```
+This returns a simple pass/fail status. If issues found, use functions below to investigate.
+
+### 2. Full Summary (If Needed)
 ```python
 ct.get_report_summary()  # All-in-one comprehensive report
 ```
 This returns everything. Use individual functions below for drilling into issues.
 
-### 2. Today's Racecard (⚠️ TIME-SENSITIVE)
+### 3. Today's Racecard (⚠️ TIME-SENSITIVE)
 ```python
 ct.get_races_by_date(ct.today())      # Today's races
 ct.get_stats_coverage(days=1)          # Racecard/stats for today
@@ -67,14 +80,14 @@ Check:
 
 **🚨 If missing:** Cannot backfill - flag as CRITICAL
 
-### 3. Date Coverage
+### 4. Date Coverage
 ```python
 ct.get_date_coverage(days=7)     # Recent date coverage
 ct.get_date_range()               # Overall data range
 ```
 Report: Coverage by date, days with missing data
 
-### 4. Yesterday's Results
+### 5. Yesterday's Results
 ```python
 ct.get_races_by_date(ct.yesterday())  # All yesterday's races
 ct.find_missing_runs()                 # Races without run data
@@ -82,19 +95,19 @@ ct.find_incomplete_races()             # Runner count mismatches
 ```
 Report: Races, run completeness, missing races
 
-### 5. BSP Coverage
+### 6. BSP Coverage
 ```python
 ct.get_bsp_coverage(days=7)  # Betfair BSP data coverage
 ```
 Report: BSP coverage %, missing BSP data
 
-### 6. Data Quality
+### 7. Data Quality
 ```python
 ct.check_data_quality()  # Comprehensive quality checks
 ```
 Report: Orphans, null values, mismatches
 
-### 7. Historical Comparison
+### 8. Historical Comparison
 ```python
 ct.get_data_summary()  # Table row counts
 ct.get_course_summary()  # Data by course
@@ -265,6 +278,11 @@ Flag these issues prominently:
 
 ## Quick Commands
 
+For quick pass/fail validation (recommended first step):
+```python
+ct.get_eod_validation()  # Quick check: today's racecard + yesterday's results
+```
+
 For full end-of-day validation:
 ```python
 ct.get_report_summary()  # Returns everything in one call
@@ -297,6 +315,7 @@ ct.get_data_summary()          # All tables
 ### Summary Reports
 | Function | Purpose |
 |----------|---------|
+| `ct.get_eod_validation()` | **Quick pass/fail check** (start here!) |
 | `ct.get_report_summary()` | **All-in-one EOD report** |
 | `ct.get_data_summary()` | Table row counts |
 | `ct.get_date_range()` | Overall data range |

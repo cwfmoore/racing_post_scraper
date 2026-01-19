@@ -1171,6 +1171,74 @@ class ClaudeTools:
             "date_coverage": self.get_date_coverage(days=7),
         }
 
+    def get_eod_validation(self) -> dict:
+        """
+        End-of-day validation check for 10pm runs.
+
+        Validates that today's 6am scrape completed successfully:
+        - Today's racecard was collected
+        - Yesterday's results were collected
+
+        Returns:
+            Dict with validation status for both checks
+        """
+        today = self.today()
+        yesterday = self.yesterday()
+
+        # Check today's racecard
+        today_races = self.get_races_by_date(today)
+        today_with_racecard = sum(1 for r in today_races if r["racecard_entries"] > 0)
+
+        # Check yesterday's results
+        yesterday_races = self.get_races_by_date(yesterday)
+        yesterday_with_runs = sum(1 for r in yesterday_races if r["actual_runs"] > 0)
+
+        # Get stats coverage for today
+        stats = self.get_stats_coverage(days=1)
+        today_stats = next(
+            (s for s in stats.get("racecard_coverage", []) if s["date"] == today),
+            {"races": 0, "with_racecard": 0, "with_horse_stats": 0}
+        )
+
+        # Determine overall status
+        issues = []
+
+        if len(today_races) == 0:
+            issues.append("⚠️ No races scheduled for today (may be normal)")
+        elif today_with_racecard == 0:
+            issues.append("❌ CRITICAL: Today's racecard NOT collected - data lost forever!")
+        elif today_with_racecard < len(today_races):
+            issues.append(f"⚠️ Partial racecard: {today_with_racecard}/{len(today_races)} races")
+
+        if len(yesterday_races) == 0:
+            issues.append("⚠️ No races found for yesterday")
+        elif yesterday_with_runs == 0:
+            issues.append("❌ CRITICAL: Yesterday's results NOT collected!")
+        elif yesterday_with_runs < len(yesterday_races):
+            issues.append(f"⚠️ Partial results: {yesterday_with_runs}/{len(yesterday_races)} races")
+
+        status = "✅ PASS" if not issues else "❌ ISSUES FOUND"
+
+        return {
+            "validation_time": datetime.now().isoformat(),
+            "status": status,
+            "issues": issues,
+            "today": {
+                "date": today,
+                "total_races": len(today_races),
+                "with_racecard": today_with_racecard,
+                "with_horse_stats": today_stats.get("with_horse_stats", 0),
+                "racecard_ok": today_with_racecard > 0 or len(today_races) == 0,
+            },
+            "yesterday": {
+                "date": yesterday,
+                "total_races": len(yesterday_races),
+                "with_runs": yesterday_with_runs,
+                "coverage_pct": round(100 * yesterday_with_runs / len(yesterday_races), 1) if yesterday_races else 0,
+                "results_ok": yesterday_with_runs == len(yesterday_races) or len(yesterday_races) == 0,
+            },
+        }
+
     def get_report_summary(self, date: str = None) -> dict:
         """
         Get comprehensive summary for end-of-day validation report.
