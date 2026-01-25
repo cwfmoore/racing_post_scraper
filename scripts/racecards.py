@@ -25,6 +25,7 @@ from utils.network import NetworkClient
 from utils.profiles import get_profiles
 from utils.region import get_region, valid_region
 from utils.stats import Stats
+from utils.betfair_matching import match_racecards_to_betfair
 
 logger = get_logger(__name__)
 
@@ -514,6 +515,12 @@ def main() -> None:
         metavar='CODE',
     )
 
+    _ = parser.add_argument(
+        '--no-betfair',
+        action='store_true',
+        help="Skip Betfair market matching.",
+    )
+
     args = parser.parse_args()
 
     dates: list[str] = [
@@ -553,6 +560,19 @@ def main() -> None:
 
         with open(_racecards_path / f'{date}.json', 'w', encoding='utf-8') as f:
             _ = f.write(dumps(racecards).decode('utf-8'))
+
+        # Match to Betfair markets
+        do_betfair = config.get('data_collection', {}).get('betfair_matching', True)
+        if do_betfair and not args.no_betfair:
+            logger.info(f'Matching {date} racecards to Betfair markets...')
+            try:
+                result = match_racecards_to_betfair(racecards, date)
+                logger.info(
+                    f'Betfair matching: {result["races_matched"]}/{result["total_races"]} races, '
+                    f'{result["runners_matched"]} runners matched'
+                )
+            except Exception as e:
+                logger.warning(f'Betfair matching failed: {e}')
 
 
 if __name__ == '__main__':

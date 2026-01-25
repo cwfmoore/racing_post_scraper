@@ -15,6 +15,7 @@ from typing import TextIO, TYPE_CHECKING
 from logging_config import setup_logging, get_logger
 from utils.argparser import ArgParser
 from utils.betfair import Betfair
+from utils.betfair_matching import match_races_to_betfair
 from utils.exceptions import RaceFetchError, NetworkError
 from utils.network import NetworkClient
 from utils.paths import Paths, build_paths
@@ -172,8 +173,11 @@ def scrape_races(
     race_type: str,
     client: NetworkClient,
     file_writer: Callable[[str, bool], TextIO],
-):
+) -> list[dict]:
+    """Scrape races and return list of race info dicts for Betfair matching."""
     from utils.race import Race, VoidRaceError
+
+    scraped_races: list[dict] = []
 
     betfair = prepare_betfair(
         race_urls=race_urls,
@@ -230,8 +234,18 @@ def scrape_races(
 
             _ = paths.progress.write_text(url)
 
+            # Collect race info for Betfair matching
+            scraped_races.append({
+                'race_id': race.race_info.race_id,
+                'date': str(race.race_info.date),
+                'course': race.race_info.course,
+                'off_time': race.race_info.off_time,
+            })
+
     logger.info('Finished scraping.')
     logger.info(f'OUTPUT_CSV={paths.output.resolve()}')
+
+    return scraped_races
 
 
 def writer_csv(file_path: str, append: bool = False) -> TextIO:
@@ -283,7 +297,29 @@ def main():
             lambda: get_race_urls(args.years, args.tracks, args.race_type, client),
         )
 
-    scrape_races(race_urls, paths, args.race_type, client, file_writer)
+    scraped_races = scrape_races(race_urls, paths, args.race_type, client, file_writer)
+
+    # Match to Betfair markets if we have race data
+    if scraped_races and settings.toml.get('betfair_matching', True):
+        # Extract unique dates from scraped races
+        dates = set()
+        for race in scraped_races:
+            if race.get('date'):
+                dates.add(race['date'])
+
+        for race_date in sorted(dates):
+            logger.info(f'Matching {race_date} results to Betfair markets...')
+            try:
+                result = match_races_to_betfair(
+                    [r for r in scraped_races if r.get('date') == race_date],
+                    race_date,
+                )
+                logger.info(
+                    f'Betfair matching: {result["races_matched"]}/{result["total_races"]} races, '
+                    f'{result["runners_matched"]} runners matched'
+                )
+            except Exception as e:
+                logger.warning(f'Betfair matching failed for {race_date}: {e}')
 
 
 if __name__ == '__main__':
