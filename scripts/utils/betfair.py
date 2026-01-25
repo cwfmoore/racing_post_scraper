@@ -1,11 +1,19 @@
 import csv
 import time
-import curl_cffi
+from random import choice
+
+import curl_cffi.requests
 
 from pathlib import Path
 from datetime import date, timedelta, datetime
 
 from models.betfair import BSP, BSPMap
+
+# Browser impersonation options (same as network.py)
+BROWSERS = [
+    'chrome110', 'chrome116', 'chrome119', 'chrome120',
+    'edge99', 'edge101',
+]
 
 
 class Betfair:
@@ -82,18 +90,25 @@ def create_urls(race_urls: list[str]) -> list[tuple[str, str]]:
 
 
 def get_data(url: str, region: str) -> list[BSP] | None:
-    resp = curl_cffi.get(url)
+    browser = choice(BROWSERS)
+    resp = curl_cffi.requests.get(url, impersonate=browser)
 
     for _ in range(4):
         if resp.status_code == 404:
             return None
         if resp.status_code == 429:
             time.sleep(10)
-            resp = curl_cffi.get(url)
+            resp = curl_cffi.requests.get(url, impersonate=browser)
             continue
         if resp.status_code == 520:
             time.sleep(10)
-            resp = curl_cffi.get(url)
+            resp = curl_cffi.requests.get(url, impersonate=browser)
+            continue
+        if resp.status_code == 403:
+            # Cloudflare block - try different browser
+            time.sleep(2)
+            browser = choice(BROWSERS)
+            resp = curl_cffi.requests.get(url, impersonate=browser)
             continue
         if resp.status_code == 200:
             break
