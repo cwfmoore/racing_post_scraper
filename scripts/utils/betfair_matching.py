@@ -143,6 +143,8 @@ def save_runner_mappings(race_id: int, market_id: str, runner_matches: list[dict
     """
     Save runner mappings to Racing Post API.
 
+    Updates rp_race.market_id and rp_run.selection_id.
+
     Args:
         race_id: Racing Post race ID
         market_id: Betfair market ID
@@ -151,28 +153,40 @@ def save_runner_mappings(race_id: int, market_id: str, runner_matches: list[dict
     Returns:
         True if saved successfully
     """
-    url = f"{RACING_POST_API_URL}/mappings/bulk/"
+    url = f"{RACING_POST_API_URL}/save-mappings/"
 
-    # Build mappings from match results
-    mappings = []
+    # Build runners list from match results
+    runners = []
     for match in runner_matches:
         if match.get("matched") and match.get("selection_id"):
-            mappings.append({
-                "race_id": race_id,
-                "market_id": market_id,
-                "runner_id": match.get("source_id"),  # RP runner ID
-                "selection_id": match.get("selection_id"),
-                "betfair_name": match.get("betfair_name"),
-                "match_method": match.get("method"),
-                "match_confidence": match.get("confidence"),
-            })
+            # source_id format is the horse_id from RP
+            source_id = match.get("source_id", "")
+            try:
+                horse_id = int(source_id) if source_id else None
+            except (ValueError, TypeError):
+                horse_id = None
 
-    if not mappings:
+            if horse_id:
+                runners.append({
+                    "horse_id": horse_id,
+                    "selection_id": match.get("selection_id"),
+                })
+
+    if not runners:
+        logger.warning(f"No matched runners to save for race {race_id}")
         return False
 
+    payload = {
+        "race_id": race_id,
+        "market_id": market_id,
+        "runners": runners,
+    }
+
     try:
-        response = requests.post(url, json={"mappings": mappings}, timeout=30)
+        response = requests.post(url, json=payload, timeout=30)
         response.raise_for_status()
+        result = response.json()
+        logger.info(f"Saved mappings for race {race_id}: {result.get('runners_updated', 0)} runners")
         return True
     except requests.RequestException as e:
         logger.warning(f"Failed to save mappings for race {race_id}: {e}")
