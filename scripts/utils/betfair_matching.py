@@ -1,16 +1,14 @@
 """
 Betfair market matching for Racing Post races.
 
-Fetches Betfair markets via API and matches them to Racing Post races
-by venue and off time, then auto-matches runners by name.
+Uses centralized matching API to match Racing Post races to Betfair markets
+by venue and time, then matches runners by name.
 """
 
 import logging
 import os
 import re
-import unicodedata
-from datetime import datetime, timedelta
-from typing import Optional
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import requests
@@ -19,23 +17,11 @@ logger = logging.getLogger(__name__)
 
 # API configuration - set API_BASE_URL in .env
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
-BETFAIR_API_URL = f"{API_BASE_URL}/api/betfair"
+MATCHING_API_URL = f"{API_BASE_URL}/api/matching"
 RACING_POST_API_URL = f"{API_BASE_URL}/api/racing-post"
 
-
-def normalize_venue(venue: str) -> str:
-    """Normalize venue name for matching."""
-    if not venue:
-        return ""
-
-    result = venue.lower()
-    # Remove accents
-    result = unicodedata.normalize("NFD", result)
-    result = "".join(c for c in result if unicodedata.category(c) != "Mn")
-    # Remove non-alphanumeric
-    result = re.sub(r"[^a-z0-9\s]", "", result)
-    result = re.sub(r"\s+", " ", result)
-    return result.strip()
+# Matching thresholds
+MATCH_THRESHOLD = 90  # 0-100 scale
 
 
 def normalize_time(time_str: str) -> str:
@@ -64,100 +50,53 @@ def normalize_time(time_str: str) -> str:
     return time_str
 
 
-def fetch_betfair_markets(
-    date: str,
-    countries: list[str] = None,
-    hours_ahead: int = 24,
-) -> list[dict]:
+def fetch_racing_post_runners(race_id: int) -> list[dict]:
     """
-    Fetch Betfair markets from API.
-
-    Args:
-        date: Date string YYYY-MM-DD
-        countries: Country codes (default: GB, IE)
-        hours_ahead: Hours ahead to fetch
-
-    Returns:
-        List of market dicts with market_id, venue, start_time, runners
-    """
-    if countries is None:
-        countries = ["GB", "IE"]
-
-    url = f"{BETFAIR_API_URL}/racecards/"
-    params = {
-        "countries": ",".join(countries),
-        "hours_ahead": hours_ahead,
-    }
-
-    try:
-        response = requests.get(url, params=params, timeout=30)
-        response.raise_for_status()
-        data = response.json()
-        return data.get("races", [])
-    except requests.RequestException as e:
-        logger.error(f"Failed to fetch Betfair markets: {e}")
-        return []
-
-
-def fetch_market_runners(market_id: str) -> list[dict]:
-    """
-    Fetch runners for a specific Betfair market.
-
-    Args:
-        market_id: Betfair market ID
-
-    Returns:
-        List of runner dicts with selection_id, name
-    """
-    url = f"{BETFAIR_API_URL}/markets/{market_id}/runners/"
-
-    try:
-        response = requests.get(url, timeout=30)
-        if response.status_code == 404:
-            # Market not in local DB, need to fetch from Betfair API
-            # Use the market info endpoint instead
-            url = f"{API_BASE_URL}/api/streaming/markets/{market_id}/runners/"
-            response = requests.get(url, timeout=30)
-
-        if response.status_code != 200:
-            logger.warning(f"Failed to fetch runners for {market_id}: {response.status_code}")
-            return []
-
-        runners = response.json()
-        # Normalize runner format
-        return [
-            {
-                "selection_id": r.get("selection_id"),
-                "name": r.get("runner_name") or r.get("name", ""),
-            }
-            for r in runners
-        ]
-    except requests.RequestException as e:
-        logger.warning(f"Failed to fetch runners for {market_id}: {e}")
-        return []
-
-
-def auto_match_race(
-    race_id: int,
-    market_id: str,
-    betfair_runners: list[dict],
-) -> dict:
-    """
-    Call API to auto-match Racing Post runners to Betfair runners.
+    Fetch runners for a Racing Post race from the API.
 
     Args:
         race_id: Racing Post race ID
+
+    Returns:
+        List of runner dicts with name
+    """
+    url = f"{RACING_POST_API_URL}/races/{race_id}/runners/"
+
+    try:
+        response = requests.get(url, timeout=30)
+        if response.status_code != 200:
+            logger.warning(f"Failed to fetch RP runners for race {race_id}: {response.status_code}")
+            return []
+
+        data = response.json()
+        runners = data.get("results", data) if isinstance(data, dict) else data
+        return [
+            {"name": r.get("horse_name") or r.get("name", ""), "source_id": str(r.get("id", i))}
+            for i, r in enumerate(runners)
+        ]
+    except requests.RequestException as e:
+        logger.warning(f"Failed to fetch RP runners for race {race_id}: {e}")
+        return []
+
+
+def match_runners_via_api(market_id: str, source_runners: list[dict]) -> dict:
+    """
+    Match source runners to Betfair selection IDs via centralized API.
+
+    Args:
         market_id: Betfair market ID
-        betfair_runners: List of Betfair runners with selection_id and name
+        source_runners: List of dicts with 'name' and 'source_id'
 
     Returns:
         API response with match results
     """
-    url = f"{RACING_POST_API_URL}/mappings/auto-match/"
+    url = f"{MATCHING_API_URL}/runners/"
     payload = {
-        "race_id": race_id,
         "market_id": market_id,
-        "betfair_runners": betfair_runners,
+        "source_runners": source_runners,
+        "config": {
+            "runner_threshold": MATCH_THRESHOLD
+        }
     }
 
     try:
@@ -165,65 +104,79 @@ def auto_match_race(
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
-        logger.error(f"Failed to auto-match race {race_id}: {e}")
-        return {"error": str(e)}
+        logger.error(f"Failed to match runners for {market_id}: {e}")
+        return {"error": str(e), "results": []}
 
 
-def match_race_to_market(
-    race_venue: str,
-    race_time: str,
-    betfair_markets: list[dict],
-    time_tolerance_minutes: int = 5,
-) -> Optional[dict]:
+def match_races_via_api(races: list[dict], date: str) -> dict:
     """
-    Find matching Betfair market for a Racing Post race.
+    Match races to Betfair markets via centralized API.
 
     Args:
-        race_venue: Racing Post venue name
-        race_time: Race off time HH:MM
-        betfair_markets: List of Betfair markets
-        time_tolerance_minutes: Minutes tolerance for time matching
+        races: List of race dicts with venue, time, runners
+        date: Date string YYYY-MM-DD
 
     Returns:
-        Matched market dict or None
+        API response with match results
     """
-    race_venue_norm = normalize_venue(race_venue)
-    race_time_norm = normalize_time(race_time)
+    url = f"{MATCHING_API_URL}/races/"
+    payload = {
+        "date": date,
+        "races": races,
+        "config": {
+            "venue_threshold": MATCH_THRESHOLD,
+            "runner_threshold": MATCH_THRESHOLD,
+            "time_tolerance_mins": 5
+        }
+    }
 
-    if not race_venue_norm or not race_time_norm:
-        return None
-
-    # Parse race time
     try:
-        race_hours, race_mins = map(int, race_time_norm.split(":"))
-        race_total_mins = race_hours * 60 + race_mins
-    except (ValueError, AttributeError):
-        return None
+        response = requests.post(url, json=payload, timeout=60)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        logger.error(f"Failed to match races for {date}: {e}")
+        return {"error": str(e), "results": []}
 
-    best_match = None
-    best_time_diff = float("inf")
 
-    for market in betfair_markets:
-        market_venue = normalize_venue(market.get("venue", ""))
-        market_time = normalize_time(market.get("start_time", ""))
+def save_runner_mappings(race_id: int, market_id: str, runner_matches: list[dict]) -> bool:
+    """
+    Save runner mappings to Racing Post API.
 
-        # Check venue match
-        if not market_venue or race_venue_norm not in market_venue and market_venue not in race_venue_norm:
-            continue
+    Args:
+        race_id: Racing Post race ID
+        market_id: Betfair market ID
+        runner_matches: List of match results from matching API
 
-        # Check time match
-        try:
-            market_hours, market_mins = map(int, market_time.split(":"))
-            market_total_mins = market_hours * 60 + market_mins
-            time_diff = abs(race_total_mins - market_total_mins)
+    Returns:
+        True if saved successfully
+    """
+    url = f"{RACING_POST_API_URL}/mappings/bulk/"
 
-            if time_diff <= time_tolerance_minutes and time_diff < best_time_diff:
-                best_time_diff = time_diff
-                best_match = market
-        except (ValueError, AttributeError):
-            continue
+    # Build mappings from match results
+    mappings = []
+    for match in runner_matches:
+        if match.get("matched") and match.get("selection_id"):
+            mappings.append({
+                "race_id": race_id,
+                "market_id": market_id,
+                "runner_id": match.get("source_id"),  # RP runner ID
+                "selection_id": match.get("selection_id"),
+                "betfair_name": match.get("betfair_name"),
+                "match_method": match.get("method"),
+                "match_confidence": match.get("confidence"),
+            })
 
-    return best_match
+    if not mappings:
+        return False
+
+    try:
+        response = requests.post(url, json={"mappings": mappings}, timeout=30)
+        response.raise_for_status()
+        return True
+    except requests.RequestException as e:
+        logger.warning(f"Failed to save mappings for race {race_id}: {e}")
+        return False
 
 
 def match_races_to_betfair(
@@ -232,35 +185,28 @@ def match_races_to_betfair(
     countries: list[str] = None,
 ) -> dict:
     """
-    Match Racing Post races to Betfair markets and auto-match runners.
+    Match Racing Post races to Betfair markets and runners via API.
 
     Args:
         races: List of Racing Post race dicts with race_id, course, off_time
         date: Date string YYYY-MM-DD
-        countries: Country codes to fetch
+        countries: Country codes (unused, API handles this)
 
     Returns:
         Dict with match statistics
     """
-    if countries is None:
-        countries = ["GB", "IE"]
-
-    logger.info(f"Fetching Betfair markets for {date}...")
-    betfair_markets = fetch_betfair_markets(date, countries)
-
-    if not betfair_markets:
-        logger.warning("No Betfair markets found")
+    if not races:
         return {
-            "total_races": len(races),
-            "markets_found": 0,
+            "total_races": 0,
             "races_matched": 0,
             "runners_matched": 0,
         }
 
-    logger.info(f"Found {len(betfair_markets)} Betfair markets")
+    logger.info(f"Matching {len(races)} races for {date} via API...")
 
-    races_matched = 0
-    total_runners_matched = 0
+    # Build race list with runners for matching API
+    api_races = []
+    race_lookup = {}  # Map source_id -> race_id for saving mappings
 
     for race in races:
         race_id = race.get("race_id")
@@ -270,37 +216,56 @@ def match_races_to_betfair(
         if not all([race_id, venue, off_time]):
             continue
 
-        # Find matching Betfair market
-        market = match_race_to_market(venue, off_time, betfair_markets)
+        # Fetch runners for this race
+        runners = fetch_racing_post_runners(race_id)
 
-        if not market:
-            logger.debug(f"No Betfair match for {venue} {off_time}")
+        source_id = f"rp_{race_id}"
+        api_races.append({
+            "venue": venue,
+            "time": normalize_time(off_time),
+            "source_id": source_id,
+            "runners": runners,
+        })
+        race_lookup[source_id] = race_id
+
+    if not api_races:
+        logger.warning("No valid races to match")
+        return {"total_races": len(races), "races_matched": 0, "runners_matched": 0}
+
+    # Call matching API
+    result = match_races_via_api(api_races, date)
+
+    if "error" in result:
+        logger.error(f"Matching API error: {result.get('error')}")
+        return {"total_races": len(races), "races_matched": 0, "runners_matched": 0}
+
+    # Process results and save mappings
+    races_matched = 0
+    total_runners_matched = 0
+
+    for race_result in result.get("results", []):
+        source_id = race_result.get("source_id")
+        race_id = race_lookup.get(source_id)
+
+        if not race_result.get("matched") or not race_id:
             continue
 
-        market_id = market.get("market_id")
-        logger.info(f"Matched {venue} {off_time} -> {market_id}")
+        market_id = race_result.get("market_id")
+        runners_matched = race_result.get("runners_matched", 0)
+        runner_results = race_result.get("runners", [])
 
-        # Fetch runners for this market
-        betfair_runners = fetch_market_runners(market_id)
-
-        if not betfair_runners:
-            logger.warning(f"No runners found for market {market_id}")
-            continue
-
-        # Auto-match runners
-        result = auto_match_race(race_id, market_id, betfair_runners)
-
-        if "error" not in result:
+        # Save mappings to Racing Post API
+        if save_runner_mappings(race_id, market_id, runner_results):
             races_matched += 1
-            matched = result.get("matched", 0)
-            total_runners_matched += matched
-            logger.info(f"  Matched {matched} runners")
+            total_runners_matched += runners_matched
+            logger.info(f"Matched race {race_id} -> {market_id} ({runners_matched} runners)")
         else:
-            logger.warning(f"  Auto-match failed: {result.get('error')}")
+            logger.warning(f"Failed to save mappings for race {race_id}")
+
+    logger.info(f"Matching complete: {races_matched}/{len(races)} races, {total_runners_matched} runners")
 
     return {
         "total_races": len(races),
-        "markets_found": len(betfair_markets),
         "races_matched": races_matched,
         "runners_matched": total_runners_matched,
     }
