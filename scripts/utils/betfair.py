@@ -100,36 +100,45 @@ def create_urls(race_urls: list[str]) -> list[tuple[str, str]]:
 
 
 def get_data(url: str, region: str) -> list[BSP] | None:
-    browser = choice(BROWSERS)
-    resp = curl_cffi.requests.get(url, impersonate=browser)
+    filename = url.split('/')[-1]
+    max_attempts = 5
+    base_delay = 2  # seconds
 
-    for _ in range(4):
-        if resp.status_code == 404:
-            # Extract filename for cleaner logging
-            filename = url.split('/')[-1]
-            logger.warning(f"BSP file not available (404): {filename}")
+    for attempt in range(1, max_attempts + 1):
+        browser = choice(BROWSERS)
+
+        try:
+            resp = curl_cffi.requests.get(url, impersonate=browser)
+        except Exception as e:
+            logger.warning(f"BSP fetch error (attempt {attempt}/{max_attempts}): {filename} - {e}")
+            if attempt < max_attempts:
+                delay = base_delay * (2 ** (attempt - 1))
+                logger.info(f"BSP retry in {delay}s: {filename}")
+                time.sleep(delay)
+                continue
             return None
-        if resp.status_code == 429:
-            time.sleep(10)
-            resp = curl_cffi.requests.get(url, impersonate=browser)
-            continue
-        if resp.status_code == 520:
-            time.sleep(10)
-            resp = curl_cffi.requests.get(url, impersonate=browser)
-            continue
-        if resp.status_code == 403:
-            # Cloudflare block - try different browser
-            time.sleep(2)
-            browser = choice(BROWSERS)
-            resp = curl_cffi.requests.get(url, impersonate=browser)
-            continue
+
         if resp.status_code == 200:
-            break
-        raise RuntimeError(f'HTTP error {resp.status_code} for URL {url}')
+            return _parse_bsp_response(resp, region, filename)
 
-    if resp.status_code != 200:
-        raise RuntimeError(f'HTTP error {resp.status_code} for URL {url}')
+        # Log the failure
+        logger.warning(f"BSP fetch failed (attempt {attempt}/{max_attempts}): {filename} - HTTP {resp.status_code}")
 
+        # Give up after max attempts
+        if attempt >= max_attempts:
+            logger.error(f"BSP fetch gave up after {max_attempts} attempts: {filename}")
+            return None
+
+        # Exponential backoff before retry
+        delay = base_delay * (2 ** (attempt - 1))
+        logger.info(f"BSP retry in {delay}s: {filename}")
+        time.sleep(delay)
+
+    return None
+
+
+def _parse_bsp_response(resp, region: str, filename: str) -> list[BSP]:
+    """Parse BSP CSV response into list of BSP objects."""
     reader = csv.DictReader(resp.content.decode().splitlines())
     rows: list[BSP] = []
 
@@ -139,7 +148,6 @@ def get_data(url: str, region: str) -> list[BSP] | None:
             rows.append(bsp)
 
     if rows:
-        filename = url.split('/')[-1]
         logger.debug(f"BSP file loaded: {filename} ({len(rows)} rows)")
 
     return rows
