@@ -8,9 +8,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - API keys, tokens, passwords
 - Internal IP addresses (e.g., 192.168.x.x)
 - Email addresses
+- Database connection strings
 - Any credentials or secrets
 
 All sensitive data must go in `.env` (gitignored).
+
+### Before Every Commit
+
+⚠️ **ALWAYS scan for sensitive data before committing:**
+
+```bash
+# Search for potential secrets
+git diff --cached | grep -iE "(password|secret|token|api.?key|192\.168\.|@.*\.(com|net|org))"
+```
+
+| Pattern | Example | Risk |
+|---------|---------|------|
+| `192.168.x.x` | `192.168.1.145` | Internal network exposure |
+| `password=` | `DB_PASSWORD="abc123"` | Credential leak |
+| `@*.com` | `user@email.com` | PII exposure |
+| `sk-`, `pk_` | API key prefixes | Service compromise |
+
+**If found:** Remove the sensitive data and use environment variables instead.
 
 ## Response Style
 
