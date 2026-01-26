@@ -1,4 +1,5 @@
 import csv
+import logging
 import time
 from random import choice
 
@@ -8,6 +9,8 @@ from pathlib import Path
 from datetime import date, timedelta, datetime
 
 from models.betfair import BSP, BSPMap
+
+logger = logging.getLogger(__name__)
 
 # Browser impersonation options (same as network.py)
 BROWSERS = [
@@ -22,17 +25,24 @@ class Betfair:
         self.data: BSPMap = {}
         self.rows: list[BSP] = []
 
+        files_found = 0
+        files_missing = 0
+
         for url, region in self.urls:
             rows = get_data(url, region)
 
             if not rows:
+                files_missing += 1
                 continue
 
+            files_found += 1
             self.rows.extend(rows)
 
             for row in rows:
                 key = (row.region, row.date, row.off)
                 self.data.setdefault(key, []).append(row)
+
+        logger.info(f"BSP fetch complete: {files_found} files found, {files_missing} not available, {len(self.rows)} total rows")
 
     @classmethod
     def from_csv(cls, path: Path) -> 'Betfair':
@@ -95,6 +105,9 @@ def get_data(url: str, region: str) -> list[BSP] | None:
 
     for _ in range(4):
         if resp.status_code == 404:
+            # Extract filename for cleaner logging
+            filename = url.split('/')[-1]
+            logger.warning(f"BSP file not available (404): {filename}")
             return None
         if resp.status_code == 429:
             time.sleep(10)
@@ -124,5 +137,9 @@ def get_data(url: str, region: str) -> list[BSP] | None:
         bsp = BSP.from_record(record, region)
         if bsp:
             rows.append(bsp)
+
+    if rows:
+        filename = url.split('/')[-1]
+        logger.debug(f"BSP file loaded: {filename} ({len(rows)} rows)")
 
     return rows

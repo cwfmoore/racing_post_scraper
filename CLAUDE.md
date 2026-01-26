@@ -39,6 +39,23 @@ All responses must be ADHD-friendly:
 - **Emojis** - Use to highlight key points and improve scannability
 - **Colors** - Use markdown formatting for emphasis
 
+## ⚠️ No Assumptions Rule
+
+**NEVER guess or assume.** If you have a hypothesis, test it first.
+
+| ❌ Don't | ✅ Do |
+|----------|-------|
+| "The issue is probably X" | Query data to verify X |
+| "This should work because..." | Test with actual code/data |
+| Assume config values | Read the actual config files |
+| Guess API responses | Make a test request |
+
+**Before concluding a root cause:**
+1. Form hypothesis
+2. Find non-destructive way to test (read-only queries, curl, test scripts)
+3. Verify with actual data
+4. Only then state the conclusion
+
 ## ⚠️ SQL Safety Rules
 
 **NEVER guess table names, column names, or SQL syntax.** This could cause data loss.
