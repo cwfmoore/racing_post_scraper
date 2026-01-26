@@ -71,7 +71,7 @@ def fetch_racing_post_runners(race_id: int) -> list[dict]:
         data = response.json()
         runners = data.get("results", data) if isinstance(data, dict) else data
         return [
-            {"name": r.get("horse_name") or r.get("name", ""), "source_id": str(r.get("id", i))}
+            {"name": r.get("horse_name") or r.get("name", ""), "source_id": str(r.get("horse_id") or r.get("id", i))}
             for i, r in enumerate(runners)
         ]
     except requests.RequestException as e:
