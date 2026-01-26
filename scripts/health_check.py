@@ -6,7 +6,7 @@ Quick verification that the scraping system is running correctly.
 
 Usage:
     python scripts/health_check.py              # Check localhost (dev)
-    python scripts/health_check.py --prod       # Check localhost (prod)
+    python scripts/health_check.py --prod       # Check prod (PROD_API_URL env var)
     python scripts/health_check.py --url http://custom:8000  # Custom URL
 
 Checks:
@@ -38,7 +38,7 @@ from api_wrapper import RacingPostAPI, APIResponse
 # ═══════════════════════════════════════════════════════════════════════════════
 
 DEV_URL = "http://localhost:8000/api/racing-post"
-PROD_URL = "http://localhost:8000/api/racing-post"
+PROD_URL = os.getenv("PROD_API_URL", "http://localhost:8000/api/racing-post")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -447,13 +447,13 @@ def main():
         epilog="""
 Examples:
   python scripts/health_check.py           # Check dev (localhost)
-  python scripts/health_check.py --prod    # Check prod (localhost)
+  python scripts/health_check.py --prod    # Check prod (PROD_API_URL)
   python scripts/health_check.py --url http://custom:8000/api/racing-post
         """
     )
     parser.add_argument(
         "--prod", action="store_true",
-        help="Check production server (localhost:8000)"
+        help="Check production server (set PROD_API_URL in .env)"
     )
     parser.add_argument(
         "--url", type=str,

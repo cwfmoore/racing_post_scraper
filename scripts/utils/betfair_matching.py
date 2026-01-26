@@ -17,7 +17,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-# API configuration
+# API configuration - set API_BASE_URL in .env
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 BETFAIR_API_URL = f"{API_BASE_URL}/api/betfair"
 RACING_POST_API_URL = f"{API_BASE_URL}/api/racing-post"

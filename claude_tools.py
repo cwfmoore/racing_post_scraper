@@ -28,12 +28,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Database config - NAS production database
-DB_HOST = os.getenv("DATABASE_HOST", "localhost")
-DB_PORT = os.getenv("DATABASE_PORT", "5433")
-DB_NAME = os.getenv("DATABASE_NAME", "maindb")
-DB_USER = os.getenv("DATABASE_USER", "postgres")
-DB_PASSWORD = os.getenv("DATABASE_PASSWORD", "REMOVED")
+# Database config - set in .env file
+DB_HOST = os.getenv("DATABASE_HOST")
+DB_PORT = os.getenv("DATABASE_PORT", "5432")
+DB_NAME = os.getenv("DATABASE_NAME")
+DB_USER = os.getenv("DATABASE_USER")
+DB_PASSWORD = os.getenv("DATABASE_PASSWORD")
 
 
 class ClaudeTools:
