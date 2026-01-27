@@ -3,7 +3,7 @@
 auto_update = false
 gzip_output = false
 
-betfair_data = false  # DISABLED - Betfair returning 403
+betfair_data = true  # Re-enabled 2026-01-27 - Betfair working again
 
 [fields]
 
