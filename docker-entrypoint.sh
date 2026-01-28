@@ -218,6 +218,7 @@ run_results() {
 
     local total_races=0
     local total_runs=0
+    local total_bsp=0
     local failed_regions=()
 
     # Loop through each region
@@ -240,18 +241,38 @@ run_results() {
 
         RACES=$(echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('races_created',0)+d.get('races_updated',0))" 2>/dev/null || echo "0")
         RUNS=$(echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('runs_created',0)+d.get('runs_updated',0))" 2>/dev/null || echo "0")
+        BSP=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('bsp_rows_fetched',0))" 2>/dev/null || echo "0")
+
+        # Check BSP coverage
+        if [ "$RUNS" -gt 0 ] && [ "$BSP" -gt 0 ]; then
+            BSP_PCT=$((BSP * 100 / RUNS))
+            if [ "$BSP_PCT" -lt 80 ]; then
+                log_warn "BSP coverage low: $BSP/$RUNS ($BSP_PCT%)"
+            else
+                log_success "BSP: $BSP rows ($BSP_PCT% coverage)"
+            fi
+        elif [ "$RUNS" -gt 0 ] && [ "$BSP" -eq 0 ]; then
+            log_warn "BSP: 0 rows fetched (0% coverage)"
+        fi
 
         log_success "Processed $RACES races, $RUNS runs for $REGION"
 
         total_races=$((total_races + RACES))
         total_runs=$((total_runs + RUNS))
+        total_bsp=$((total_bsp + BSP))
     done
 
     # Summary
     log ""
     log "═══════════════════════════════════════════════════════════"
     if [ ${#failed_regions[@]} -eq 0 ]; then
-        log_success "RESULTS JOB COMPLETE: $total_races races, $total_runs runs"
+        # Calculate overall BSP coverage
+        if [ "$total_runs" -gt 0 ]; then
+            TOTAL_BSP_PCT=$((total_bsp * 100 / total_runs))
+            log_success "RESULTS JOB COMPLETE: $total_races races, $total_runs runs, $total_bsp BSP ($TOTAL_BSP_PCT%)"
+        else
+            log_success "RESULTS JOB COMPLETE: $total_races races, $total_runs runs"
+        fi
         return 0
     else
         log_error "RESULTS JOB COMPLETED WITH ERRORS"
