@@ -113,7 +113,7 @@ class APILogHandler(logging.Handler):
         """Post log record to API."""
         try:
             payload = {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "time_stamp": datetime.now(timezone.utc).isoformat(),
                 "app_name": self.app_name,
                 "log_type": "error",
                 "message": self.format(record),

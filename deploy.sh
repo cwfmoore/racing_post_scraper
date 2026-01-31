@@ -28,10 +28,10 @@ HOSTNAME=$(hostname)
 # Post log to central API (fails silently)
 api_log() {
     local message="$1"
-    local timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    local time_stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     curl -s -X POST "$API_URL" \
         -H "Content-Type: application/json" \
-        -d "{\"timestamp\": \"$timestamp\", \"app_name\": \"$APP_NAME\", \"log_type\": \"deployment\", \"message\": \"$message\", \"hostname\": \"$HOSTNAME\"}" \
+        -d "{\"time_stamp\": \"$time_stamp\", \"app_name\": \"$APP_NAME\", \"log_type\": \"deployment\", \"message\": \"$message\", \"hostname\": \"$HOSTNAME\"}" \
         >/dev/null 2>&1 || true
 }
 
