@@ -5,8 +5,11 @@ Provides daily rotating error logs with automatic cleanup of files older than re
 """
 
 import logging
-from datetime import datetime, timedelta
+import socket
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+import requests
 
 
 class DailyErrorFileHandler(logging.Handler):
@@ -87,3 +90,42 @@ class DailyErrorFileHandler(logging.Handler):
             self._file_handle.close()
             self._file_handle = None
         super().close()
+
+
+class APILogHandler(logging.Handler):
+    """
+    Logging handler that posts errors to the central logging API.
+    Fails silently to avoid breaking the app.
+    """
+
+    def __init__(
+        self,
+        api_url: str = "http://192.168.1.145:8000/api/logs/",
+        app_name: str = "racing_post_scraper",
+    ):
+        super().__init__()
+        self.api_url = api_url
+        self.app_name = app_name
+        self.hostname = socket.gethostname()
+        self.setLevel(logging.WARNING)
+
+    def emit(self, record):
+        """Post log record to API."""
+        try:
+            payload = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "app_name": self.app_name,
+                "log_type": "error",
+                "message": self.format(record),
+                "hostname": self.hostname,
+                "metadata": {
+                    "level": record.levelname,
+                    "logger": record.name,
+                    "module": record.module,
+                    "line": record.lineno,
+                },
+            }
+            requests.post(self.api_url, json=payload, timeout=5)
+        except Exception:
+            # Fail silently - logging shouldn't break the app
+            pass

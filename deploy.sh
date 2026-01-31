@@ -21,6 +21,21 @@ find logs -name ".gitkeep" -delete 2>/dev/null || true
 
 # Log file for this run
 LOG_FILE="logs/deploy/$(date +%Y-%m-%d)_deploy_log.txt"
+APP_NAME="racing_post_scraper"
+API_URL="http://192.168.1.145:8000/api/logs/"
+HOSTNAME=$(hostname)
+
+# Post log to central API (fails silently)
+api_log() {
+    local message="$1"
+    local timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    curl -s -X POST "$API_URL" \
+        -H "Content-Type: application/json" \
+        -d "{\"timestamp\": \"$timestamp\", \"app_name\": \"$APP_NAME\", \"log_type\": \"deployment\", \"message\": \"$message\", \"hostname\": \"$HOSTNAME\"}" \
+        >/dev/null 2>&1 || true
+}
+
+api_log "Deploy started"
 
 {
     echo "========================================="
@@ -48,6 +63,8 @@ LOG_FILE="logs/deploy/$(date +%Y-%m-%d)_deploy_log.txt"
     echo "========================================="
 
 } 2>&1 | tee -a "$LOG_FILE"
+
+api_log "Deploy complete"
 
 # Cleanup old logs (90 days)
 find logs/deploy -name "*.txt" -mtime +90 -delete 2>/dev/null || true
