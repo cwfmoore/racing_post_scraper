@@ -3,16 +3,12 @@ Logging configuration for the Racing Post scraper.
 
 Provides:
 - Console logging (INFO+) for docker compose logs
-- Daily error log files (WARNING+) with 90-day retention
+- API logging (WARNING+) to central logging server
 """
 
 import logging
-from pathlib import Path
 
-from utils.logging_handlers import DailyErrorFileHandler, APILogHandler
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-ERROR_LOG_DIR = BASE_DIR / 'error_logs'
+from utils.logging_handlers import APILogHandler
 
 
 def setup_logging():
@@ -28,14 +24,6 @@ def setup_logging():
     console_handler.setFormatter(formatter)
     console_handler.setLevel(logging.INFO)
 
-    # Error file handler (WARNING and above only)
-    error_file_handler = DailyErrorFileHandler(
-        log_dir=str(ERROR_LOG_DIR),
-        retention_days=90
-    )
-    error_file_handler.setFormatter(formatter)
-    error_file_handler.setLevel(logging.WARNING)
-
     # API handler for central logging
     api_handler = APILogHandler(app_name='racing_post_scraper')
     api_handler.setFormatter(formatter)
@@ -45,7 +33,6 @@ def setup_logging():
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)
     root_logger.addHandler(console_handler)
-    root_logger.addHandler(error_file_handler)
     root_logger.addHandler(api_handler)
 
 
